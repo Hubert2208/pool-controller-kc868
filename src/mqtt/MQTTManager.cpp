@@ -26,7 +26,6 @@ void MQTTManager::begin() {
     _client.setServer(cfg.mqtt.broker.c_str(), cfg.mqtt.port);
     _client.setCallback(mqttCallback);
     _client.setBufferSize(1024);
-    _client.setKeepAlive(cfg.mqtt.keepAliveSec);
 
     log_i("MQTT: broker=%s:%d, base=%s, client=%s",
           cfg.mqtt.broker.c_str(), cfg.mqtt.port,

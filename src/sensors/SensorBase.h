@@ -2,6 +2,7 @@
 #define SENSOR_BASE_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 class SensorBase {
 public:
