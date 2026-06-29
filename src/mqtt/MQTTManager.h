@@ -32,7 +32,7 @@ public:
     void publishOffline();
 
     // Check if connected
-    bool isConnected() const { return _client.connected(); }
+    bool isConnected() { return _client.connected(); }
 
     // Set command callback
     void setCommandCallback(void (*callback)(const char* topic, const String& payload));
@@ -66,7 +66,7 @@ private:
     // Command handler reference
     static MQTTManager* _instance;
     void (*_commandCallback)(const char* topic, const String& payload);
-    void handleMQTTMessage(char* topic, byte* payload, unsigned int length);
+    void handleMQTTMessage(char* topic, const String& payload);
 };
 
 #endif // MQTT_MANAGER_H

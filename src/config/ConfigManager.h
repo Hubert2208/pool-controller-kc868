@@ -23,7 +23,7 @@ struct PIDParams {
     int minOffTimeSec = 60;
 
     String toJson() const;
-    static PIDParams fromJson(const JsonVariant& json);
+    static PIDParams fromJson(JsonVariantConst json);
 };
 
 struct SensorConfig {
@@ -35,7 +35,7 @@ struct SensorConfig {
     float simDriftPerHour = 0.5;
 
     String toJson() const;
-    static SensorConfig fromJson(const JsonVariant& json);
+    static SensorConfig fromJson(JsonVariantConst json);
 };
 
 struct WifiConfig {
@@ -47,7 +47,7 @@ struct WifiConfig {
     String apPassword = "12345678";
 
     String toJson() const;
-    static WifiConfig fromJson(const JsonVariant& json);
+    static WifiConfig fromJson(JsonVariantConst json);
 };
 
 struct MqttConfig {
@@ -60,7 +60,7 @@ struct MqttConfig {
     int keepAliveSec = 60;
 
     String toJson() const;
-    static MqttConfig fromJson(const JsonVariant& json);
+    static MqttConfig fromJson(JsonVariantConst json);
 };
 
 struct PumpConfig {
@@ -70,7 +70,7 @@ struct PumpConfig {
     float maxDailyRuntimeMin = 1440.0;
 
     String toJson() const;
-    static PumpConfig fromJson(const JsonVariant& json);
+    static PumpConfig fromJson(JsonVariantConst json);
 };
 
 struct FilterPumpConfig {
@@ -83,7 +83,7 @@ struct FilterPumpConfig {
     int maxCycleMinutes = 480;
 
     String toJson() const;
-    static FilterPumpConfig fromJson(const JsonVariant& json);
+    static FilterPumpConfig fromJson(JsonVariantConst json);
 };
 
 struct RelayConfig {
@@ -93,7 +93,7 @@ struct RelayConfig {
     int maxOnTimeSec = 0;             // 0 = unlimited
 
     String toJson() const;
-    static RelayConfig fromJson(const JsonVariant& json);
+    static RelayConfig fromJson(JsonVariantConst json);
 };
 
 struct AppConfig {

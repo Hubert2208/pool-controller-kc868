@@ -17,9 +17,9 @@ String PIDParams::toJson() const {
     return out;
 }
 
-PIDParams PIDParams::fromJson(const JsonVariant& json) {
+PIDParams PIDParams::fromJson(JsonVariantConst json) {
     PIDParams p;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         p.kp = json["kp"] | p.kp;
         p.ki = json["ki"] | p.ki;
         p.kd = json["kd"] | p.kd;
@@ -45,9 +45,9 @@ String SensorConfig::toJson() const {
     return out;
 }
 
-SensorConfig SensorConfig::fromJson(const JsonVariant& json) {
+SensorConfig SensorConfig::fromJson(JsonVariantConst json) {
     SensorConfig s;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         s.enabled = json["enabled"] | s.enabled;
         s.simulate = json["simulate"] | s.simulate;
         s.updateIntervalMs = json["updateIntervalMs"] | s.updateIntervalMs;
@@ -71,9 +71,9 @@ String WifiConfig::toJson() const {
     return out;
 }
 
-WifiConfig WifiConfig::fromJson(const JsonVariant& json) {
+WifiConfig WifiConfig::fromJson(JsonVariantConst json) {
     WifiConfig w;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         if (json["ssid"].is<const char*>()) w.ssid = json["ssid"].as<const char*>();
         if (json["password"].is<const char*>()) w.password = json["password"].as<const char*>();
         if (json["hostname"].is<const char*>()) w.hostname = json["hostname"].as<const char*>();
@@ -98,9 +98,9 @@ String MqttConfig::toJson() const {
     return out;
 }
 
-MqttConfig MqttConfig::fromJson(const JsonVariant& json) {
+MqttConfig MqttConfig::fromJson(JsonVariantConst json) {
     MqttConfig m;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         if (json["broker"].is<const char*>()) m.broker = json["broker"].as<const char*>();
         m.port = json["port"] | m.port;
         if (json["clientId"].is<const char*>()) m.clientId = json["clientId"].as<const char*>();
@@ -123,9 +123,9 @@ String PumpConfig::toJson() const {
     return out;
 }
 
-PumpConfig PumpConfig::fromJson(const JsonVariant& json) {
+PumpConfig PumpConfig::fromJson(JsonVariantConst json) {
     PumpConfig p;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         p.relayChannel = json["relayChannel"] | p.relayChannel;
         p.minOnTimeSec = json["minOnTimeSec"] | p.minOnTimeSec;
         p.minOffTimeSec = json["minOffTimeSec"] | p.minOffTimeSec;
@@ -148,9 +148,9 @@ String FilterPumpConfig::toJson() const {
     return out;
 }
 
-FilterPumpConfig FilterPumpConfig::fromJson(const JsonVariant& json) {
+FilterPumpConfig FilterPumpConfig::fromJson(JsonVariantConst json) {
     FilterPumpConfig f;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         f.relayChannel = json["relayChannel"] | f.relayChannel;
         f.tempSlope = json["tempSlope"] | f.tempSlope;
         f.tempIntercept = json["tempIntercept"] | f.tempIntercept;
@@ -173,9 +173,9 @@ String RelayConfig::toJson() const {
     return out;
 }
 
-RelayConfig RelayConfig::fromJson(const JsonVariant& json) {
+RelayConfig RelayConfig::fromJson(JsonVariantConst json) {
     RelayConfig r;
-    if (json.is<JsonObject>()) {
+    if (json.is<JsonObjectConst>()) {
         r.channel = json["channel"] | r.channel;
         if (json["name"].is<const char*>()) r.name = json["name"].as<const char*>();
         r.normallyOpen = json["normallyOpen"] | r.normallyOpen;

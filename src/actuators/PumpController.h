@@ -43,12 +43,12 @@ private:
     unsigned long _lastOnTime;
     unsigned long _lastOffTime;
     unsigned long _cycleStartTime;
-    unsigned long _dailyRuntimeMs;
-    unsigned long _lastDailyReset;
+    mutable unsigned long _dailyRuntimeMs;
+    mutable unsigned long _lastDailyReset;
 
     bool _initialized;
 
-    void updateDailyReset();
+    void updateDailyReset() const;
 };
 
 #endif // PUMP_CONTROLLER_H

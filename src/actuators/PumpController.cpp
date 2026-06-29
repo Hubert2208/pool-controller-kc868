@@ -1,4 +1,5 @@
 #include "PumpController.h"
+#include <ArduinoJson.h>
 
 PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel, const char* name)
     : _relayManager(relayManager)
@@ -138,7 +139,7 @@ void PumpController::resetDailyRuntime() {
     log_i("Pump '%s' daily runtime reset", _name);
 }
 
-void PumpController::updateDailyReset() {
+void PumpController::updateDailyReset() const {
     // Reset daily runtime at midnight
     unsigned long now = millis();
     unsigned long msSinceMidnight = now % 86400000UL;

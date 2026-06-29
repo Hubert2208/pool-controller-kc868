@@ -20,7 +20,7 @@ public:
     bool isConnected() const override { return _connected; }
 
     // Get address of the sensor on the bus
-    DeviceAddress getAddress() const { return _address; }
+    const uint8_t* getAddress() const { return _address; }
 
 private:
     OneWire _oneWire;

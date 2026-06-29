@@ -447,8 +447,9 @@ void resetByWatchdog() {
     ESP.restart();
 }
 
-extern "C" void __assert_func(const char* file, int line, const char* func, const char* expr) {
+extern "C" void __attribute__((noreturn)) __assert_func(const char* file, int line, const char* func, const char* expr) {
     log_e("Assertion failed: %s, file %s, line %d, func %s", expr, file, line, func);
     delay(1000);
     ESP.restart();
+    while (true) {}
 }
