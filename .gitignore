@@ -1,0 +1,11 @@
+.pio/
+.vscode/
+*.pyc
+__pycache__/
+*.bin
+*.elf
+*.map
+.DS_Store
+Thumbs.db
+data/config.json
+!data/config.json.example

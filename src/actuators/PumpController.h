@@ -1,0 +1,54 @@
+#ifndef PUMP_CONTROLLER_H
+#define PUMP_CONTROLLER_H
+
+#include <Arduino.h>
+#include "RelayManager.h"
+
+class PumpController {
+public:
+    PumpController(RelayManager& relayManager, uint8_t relayChannel, const char* name);
+
+    void begin();
+
+    // Main control
+    bool turnOn();
+    bool turnOff();
+    bool forceOff();     // Bypasses minimum on-time check (safety)
+    bool isOn() const;
+
+    // Runtime tracking
+    unsigned long getRuntimeToday() const;
+    unsigned long getRuntimeMinutes() const;
+    unsigned long getLastOnDuration() const;
+    unsigned long getLastOffDuration() const;
+
+    // Configuration
+    void setMinOnTime(unsigned long ms);
+    void setMinOffTime(unsigned long ms);
+    void resetDailyRuntime();
+
+    const char* getName() const { return _name; }
+    uint8_t getRelayChannel() const { return _relayChannel; }
+
+    // JSON state for MQTT
+    String getStateJSON() const;
+
+private:
+    RelayManager& _relayManager;
+    uint8_t _relayChannel;
+    char _name[24];
+
+    unsigned long _minOnTimeMs;
+    unsigned long _minOffTimeMs;
+    unsigned long _lastOnTime;
+    unsigned long _lastOffTime;
+    unsigned long _cycleStartTime;
+    unsigned long _dailyRuntimeMs;
+    unsigned long _lastDailyReset;
+
+    bool _initialized;
+
+    void updateDailyReset();
+};
+
+#endif // PUMP_CONTROLLER_H
