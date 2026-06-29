@@ -25,7 +25,7 @@ public:
     // Configuration
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
-    void resetDailyRuntime();
+    void resetDailyRuntime() const;
 
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }

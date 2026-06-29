@@ -133,7 +133,7 @@ void PumpController::setMinOffTime(unsigned long ms) {
     _minOffTimeMs = ms;
 }
 
-void PumpController::resetDailyRuntime() {
+void PumpController::resetDailyRuntime() const {
     _dailyRuntimeMs = 0;
     _lastDailyReset = millis();
     log_i("Pump '%s' daily runtime reset", _name);
