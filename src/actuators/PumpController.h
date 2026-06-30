@@ -10,19 +10,16 @@ public:
 
     void begin();
 
-    // Main control
     bool turnOn();
     bool turnOff();
-    bool forceOff();     // Bypasses minimum on-time check (safety)
+    bool forceOff();
     bool isOn() const;
 
-    // Runtime tracking
     unsigned long getRuntimeToday() const;
     unsigned long getRuntimeMinutes() const;
     unsigned long getLastOnDuration() const;
     unsigned long getLastOffDuration() const;
 
-    // Configuration
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
     void resetDailyRuntime() const;
@@ -30,7 +27,6 @@ public:
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }
 
-    // JSON state for MQTT
     String getStateJSON() const;
 
 private:

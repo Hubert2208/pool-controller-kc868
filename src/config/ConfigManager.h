@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <SPIFFS.h>
+#include <LittleFS.h>
 
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
@@ -16,7 +16,7 @@ struct PIDParams {
     float kp = 1.0;
     float ki = 0.1;
     float kd = 0.05;
-    float setpoint = 7.2;       // pH setpoint
+    float setpoint = 7.2;
     float outputMin = 0.0;
     float outputMax = 100.0;
     int minOnTimeSec = 10;
@@ -75,8 +75,8 @@ struct PumpConfig {
 
 struct FilterPumpConfig {
     int relayChannel = 0;
-    float tempSlope = -7.5;           // minutes per °C (higher temp = less runtime)
-    float tempIntercept = 300.0;      // base minutes at 0°C
+    float tempSlope = -7.5;
+    float tempIntercept = 300.0;
     String windowStart = "07:00";
     String windowEnd = "21:00";
     int minCycleMinutes = 60;
@@ -90,7 +90,7 @@ struct RelayConfig {
     int channel = 0;
     String name = "";
     bool normallyOpen = true;
-    int maxOnTimeSec = 0;             // 0 = unlimited
+    int maxOnTimeSec = 0;
 
     String toJson() const;
     static RelayConfig fromJson(JsonVariantConst json);
@@ -131,8 +131,8 @@ public:
 private:
     AppConfig _config;
     void setDefaults();
-    bool loadFromSPIFFS();
-    bool saveToSPIFFS();
+    bool loadFromLittleFS();
+    bool saveToLittleFS();
     bool createDefaultConfig();
 };
 

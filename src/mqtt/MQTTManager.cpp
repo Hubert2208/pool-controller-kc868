@@ -55,7 +55,6 @@ void MQTTManager::loop() {
 bool MQTTManager::connect() {
     AppConfig& cfg = _config.get();
 
-    // Build LWT (Last Will and Testament) payload
     StaticJsonDocument<64> lwtDoc;
     lwtDoc["state"] = "offline";
     lwtDoc["client"] = cfg.mqtt.clientId.c_str();
@@ -69,8 +68,8 @@ bool MQTTManager::connect() {
             cfg.mqtt.username.c_str(),
             cfg.mqtt.password.c_str(),
             _lwtTopic.c_str(),
-            1,       // QoS
-            true,    // retain
+            1,
+            true,
             lwtPayload.c_str()
         );
     } else {
@@ -87,8 +86,6 @@ bool MQTTManager::connect() {
         log_i("MQTT connected to %s:%d", cfg.mqtt.broker.c_str(), cfg.mqtt.port);
         publishOnline();
         subscribeCommands();
-
-        // Publish discovery
         publishDiscovery();
         return true;
     }
@@ -100,13 +97,11 @@ bool MQTTManager::connect() {
 void MQTTManager::subscribeCommands() {
     AppConfig& cfg = _config.get();
 
-    // Subscribe to command topics
     String cmdTopic = _baseTopic + "/command/#";
     if (_client.subscribe(cmdTopic.c_str(), 1)) {
         log_i("MQTT subscribed: %s", cmdTopic.c_str());
     }
 
-    // Subscribe to config update topic
     String cfgTopic = _baseTopic + "/config/set";
     if (_client.subscribe(cfgTopic.c_str(), 1)) {
         log_i("MQTT subscribed: %s", cfgTopic.c_str());
@@ -160,7 +155,6 @@ void MQTTManager::publishDiscovery() {
     if (_discoveryPublished) return;
     AppConfig& cfg = _config.get();
 
-    // Device info for HA
     StaticJsonDocument<256> deviceDoc;
     deviceDoc["identifiers"][0] = cfg.mqtt.clientId.c_str();
     deviceDoc["name"] = "Pool Controller";
@@ -170,7 +164,6 @@ void MQTTManager::publishDiscovery() {
     String deviceStr;
     serializeJson(deviceDoc, deviceStr);
 
-    // Helper: build device JSON for each sensor
     auto discoveryTopic = [&](const char* type, const char* objId) -> String {
         return "homeassistant/" + String(type) + "/" + cfg.mqtt.clientId + "/" + objId + "/config";
     };
@@ -178,21 +171,18 @@ void MQTTManager::publishDiscovery() {
     char topicBuf[256];
     String payload;
 
-    // pH sensor
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph").c_str());
     payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.ph.value }}\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_ph\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // ORP sensor
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "orp").c_str());
     payload = "{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.orp.value }}\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_orp\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Water temperature
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "water_temp").c_str());
     payload = "{\"device_class\":\"temperature\",\"name\":\"Pool Water Temperature\","
               "\"unit_of_measurement\":\"°C\","
@@ -201,7 +191,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_wt\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Air temperature
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "air_temp").c_str());
     payload = "{\"device_class\":\"temperature\",\"name\":\"Air Temperature\",\"unit_of_measurement\":\"°C\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
@@ -209,7 +198,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_at\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Humidity
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "humidity").c_str());
     payload = "{\"device_class\":\"humidity\",\"name\":\"Air Humidity\",\"unit_of_measurement\":\"%\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
@@ -217,7 +205,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_hum\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Filter pressure
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "filter_pressure").c_str());
     payload = "{\"device_class\":\"pressure\",\"name\":\"Filter Pressure\",\"unit_of_measurement\":\"bar\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
@@ -225,7 +212,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fp\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Backwash binary sensor
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("binary_sensor", "needs_backwash").c_str());
     payload = "{\"device_class\":\"problem\",\"name\":\"Needs Backwash\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
@@ -233,7 +219,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_bw\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Chemistry state topic
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph_pid_output").c_str());
     payload = "{\"name\":\"pH PID Output\",\"unit_of_measurement\":\"%\","
               "\"state_topic\":\"" + _baseTopic + "/chemistry\","
@@ -241,7 +226,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phpo\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Filter runtime
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "filter_required").c_str());
     payload = "{\"name\":\"Required Filter Runtime\",\"unit_of_measurement\":\"min\","
               "\"state_topic\":\"" + _baseTopic + "/filter\","
@@ -249,7 +233,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_frt\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Switch: pH control enable
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("switch", "ph_enable").c_str());
     payload = "{\"name\":\"pH Control\","
               "\"state_topic\":\"" + _baseTopic + "/chemistry\","
@@ -259,7 +242,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phen\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Switch: chlorine control enable
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("switch", "chlorine_enable").c_str());
     payload = "{\"name\":\"Chlorine Control\","
               "\"state_topic\":\"" + _baseTopic + "/chemistry\","
@@ -269,7 +251,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_clen\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Number: pH setpoint
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "ph_setpoint").c_str());
     payload = "{\"name\":\"pH Setpoint\",\"unit_of_measurement\":\"pH\","
               "\"state_topic\":\"" + _baseTopic + "/chemistry\","
@@ -279,7 +260,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phsp\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // Number: ORP setpoint
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "orp_setpoint").c_str());
     payload = "{\"name\":\"ORP Setpoint\",\"unit_of_measurement\":\"mV\","
               "\"state_topic\":\"" + _baseTopic + "/chemistry\","
@@ -307,7 +287,6 @@ void MQTTManager::handleMQTTMessage(char* topic, const String& payload) {
     String topicStr = String(topic);
     log_i("MQTT message: %s -> %s", topicStr.c_str(), payload.c_str());
 
-    // Notify external callback if registered
     if (_commandCallback) {
         _commandCallback(topic, payload);
     }

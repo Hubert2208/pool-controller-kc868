@@ -61,7 +61,7 @@ SensorConfig SensorConfig::fromJson(JsonVariantConst json) {
 String WifiConfig::toJson() const {
     StaticJsonDocument<256> doc;
     doc["ssid"] = ssid;
-    doc["password"] = "****";       // mask in output
+    doc["password"] = "****";
     doc["hostname"] = hostname;
     doc["fallbackAP"] = fallbackAP;
     doc["apSSID"] = apSSID;
@@ -341,7 +341,6 @@ ConfigManager::ConfigManager() {}
 void ConfigManager::setDefaults() {
     _config = AppConfig();
 
-    // Default relay configuration for KC868-A8
     const char* relayNames[MAX_RELAYS] = {
         "Filter Pumpe", "pH Pumpe", "Chlor Pumpe",
         "Relay 4", "Relay 5", "Relay 6",
@@ -355,33 +354,27 @@ void ConfigManager::setDefaults() {
     }
     _config.relayCount = MAX_RELAYS;
 
-    // Pump relay assignments
     _config.phPump.relayChannel = 1;
     _config.chlorinePump.relayChannel = 2;
     _config.filterPump.relayChannel = 0;
 
-    // pH sensor defaults (simulation mode)
     _config.phSensor.simMin = 6.8;
     _config.phSensor.simMax = 7.6;
     _config.phSensor.simDriftPerHour = 0.05;
 
-    // ORP sensor defaults
     _config.orpSensor.simMin = 200.0;
     _config.orpSensor.simMax = 800.0;
     _config.orpSensor.simDriftPerHour = 10.0;
 
-    // Temperature sensors
     _config.tempAirSensor.simMin = 10.0;
     _config.tempAirSensor.simMax = 40.0;
     _config.tempWaterSensor.simMin = 5.0;
     _config.tempWaterSensor.simMax = 35.0;
 
-    // Pressure sensor
     _config.pressureSensor.simMin = 0.0;
     _config.pressureSensor.simMax = 2.5;
     _config.pressureSensor.simDriftPerHour = 0.1;
 
-    // PID defaults for pH
     _config.phPID.kp = 1.2;
     _config.phPID.ki = 0.08;
     _config.phPID.kd = 0.04;
@@ -389,7 +382,6 @@ void ConfigManager::setDefaults() {
     _config.phPID.minOnTimeSec = 15;
     _config.phPID.minOffTimeSec = 60;
 
-    // PID defaults for chlorine (ORP target ~650mV)
     _config.chlorinePID.kp = 0.8;
     _config.chlorinePID.ki = 0.05;
     _config.chlorinePID.kd = 0.02;
@@ -399,28 +391,28 @@ void ConfigManager::setDefaults() {
 }
 
 bool ConfigManager::begin() {
-    if (!SPIFFS.begin(true)) {
-        log_e("SPIFFS mount failed");
+    if (!LittleFS.begin(true)) {
+        log_e("LittleFS mount failed");
         setDefaults();
         return false;
     }
 
-    if (!loadFromSPIFFS()) {
+    if (!loadFromLittleFS()) {
         log_w("No config found, creating defaults");
         setDefaults();
-        saveToSPIFFS();
+        saveToLittleFS();
     }
 
     log_i("Config loaded successfully");
     return true;
 }
 
-bool ConfigManager::loadFromSPIFFS() {
-    if (!SPIFFS.exists(CONFIG_FILE)) {
+bool ConfigManager::loadFromLittleFS() {
+    if (!LittleFS.exists(CONFIG_FILE)) {
         return false;
     }
 
-    File file = SPIFFS.open(CONFIG_FILE, FILE_READ);
+    File file = LittleFS.open(CONFIG_FILE, FILE_READ);
     if (!file) {
         log_e("Failed to open config file");
         return false;
@@ -439,8 +431,8 @@ bool ConfigManager::loadFromSPIFFS() {
     return true;
 }
 
-bool ConfigManager::saveToSPIFFS() {
-    File file = SPIFFS.open(CONFIG_FILE, FILE_WRITE);
+bool ConfigManager::saveToLittleFS() {
+    File file = LittleFS.open(CONFIG_FILE, FILE_WRITE);
     if (!file) {
         log_e("Failed to write config file");
         return false;
@@ -456,7 +448,7 @@ bool ConfigManager::saveToSPIFFS() {
 
 bool ConfigManager::createDefaultConfig() {
     setDefaults();
-    return saveToSPIFFS();
+    return saveToLittleFS();
 }
 
 AppConfig& ConfigManager::get() {
@@ -464,7 +456,7 @@ AppConfig& ConfigManager::get() {
 }
 
 bool ConfigManager::save() {
-    return saveToSPIFFS();
+    return saveToLittleFS();
 }
 
 bool ConfigManager::updateFromJson(const String& json) {
@@ -476,7 +468,6 @@ bool ConfigManager::updateFromJson(const String& json) {
         return false;
     }
 
-    // Apply partial updates — only overwrite keys that exist in the incoming JSON
     AppConfig current = _config;
 
     if (doc["wifi"].is<JsonObject>()) {
@@ -563,7 +554,7 @@ bool ConfigManager::updateFromJson(const String& json) {
     }
 
     _config = current;
-    return saveToSPIFFS();
+    return saveToLittleFS();
 }
 
 String ConfigManager::toJson() {

@@ -19,7 +19,7 @@ PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel,
 
 void PumpController::begin() {
     _lastOnTime = 0;
-    _lastOffTime = millis();  // So we can turn on immediately = factory state
+    _lastOffTime = millis();
     _cycleStartTime = 0;
     _dailyRuntimeMs = 0;
     _lastDailyReset = millis();
@@ -34,7 +34,6 @@ bool PumpController::turnOn() {
     unsigned long now = millis();
     unsigned long offDuration = now - _lastOffTime;
 
-    // Check minimum off time
     if (_lastOffTime > 0 && offDuration < (unsigned long)_minOffTimeMs) {
         unsigned long remaining = _minOffTimeMs - offDuration;
         log_w("Pump '%s' min off time not met: %lu ms remaining", _name, remaining);
@@ -55,7 +54,6 @@ bool PumpController::turnOff() {
     unsigned long now = millis();
     unsigned long onDuration = (_cycleStartTime > 0) ? (now - _cycleStartTime) : 0;
 
-    // Check minimum on time
     if (onDuration > 0 && onDuration < (unsigned long)_minOnTimeMs) {
         unsigned long remaining = _minOnTimeMs - onDuration;
         log_w("Pump '%s' min on time not met: %lu ms remaining", _name, remaining);
@@ -63,7 +61,6 @@ bool PumpController::turnOff() {
     }
 
     if (_relayManager.setRelay(_relayChannel, false)) {
-        // Add to daily runtime
         _dailyRuntimeMs += onDuration;
         _lastOffTime = now;
         _cycleStartTime = 0;
@@ -140,19 +137,16 @@ void PumpController::resetDailyRuntime() const {
 }
 
 void PumpController::updateDailyReset() const {
-    // Reset daily runtime at midnight
     unsigned long now = millis();
     unsigned long msSinceMidnight = now % 86400000UL;
     unsigned long msSinceReset = now - _lastDailyReset;
 
-    // If more than 24h has passed or current time is before last reset (wrap), reset
     if (msSinceReset > 86400000UL) {
         resetDailyRuntime();
     }
 
-    // Check if midnight just passed
     static unsigned long lastCheck = now;
-    if (lastCheck > now) lastCheck = now;  // millis() wrap
+    if (lastCheck > now) lastCheck = now;
     lastCheck = now;
 }
 

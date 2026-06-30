@@ -12,7 +12,6 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <SPIFFS.h>
 #include <esp_task_wdt.h>
 
 #include "config/ConfigManager.h"
@@ -45,7 +44,7 @@ MQTTManager* mqttManager = nullptr;
 // ─── Timing & Status ──────────────────────────────────────────────────
 
 static unsigned long lastSensorPublish = 0;
-static const unsigned long SENSOR_PUBLISH_INTERVAL = 30000;  // 30 sec
+static const unsigned long SENSOR_PUBLISH_INTERVAL = 30000;
 static unsigned long wifiReconnectTime = 0;
 static bool wifiConnected = false;
 static bool ntpSynced = false;
@@ -170,7 +169,6 @@ void setupWiFi() {
         }
     }
 
-    // Fallback AP mode
     if (cfg.wifi.fallbackAP) {
         String apSSID = cfg.wifi.apSSID;
         String apPassword = cfg.wifi.apPassword;
@@ -230,7 +228,6 @@ void handleMQTTCommand(const char* topic, const String& payload) {
         bool en = (payload == "true" || payload == "1" || payload == "ON");
         if (chemistryController) chemistryController->setChlorineEnabled(en);
     } else if (t == base + "relay") {
-        // Format: relay,channel,0|1
         int comma1 = payload.indexOf(',');
         int comma2 = payload.indexOf(',', comma1 + 1);
         if (comma1 > 0 && comma2 > 0) {
@@ -274,28 +271,23 @@ void setup() {
     log_i("ESP32 @ %d MHz", getCpuFrequencyMhz());
     log_i("Free heap: %u bytes", ESP.getFreeHeap());
 
-    // Initialize task watchdog
-    esp_task_wdt_init(30, true);   // 30 second timeout, panic on expiry
+    esp_task_wdt_init(30, true);
     esp_task_wdt_add(NULL);
 
-    // Initialize configuration
     if (!configManager.begin()) {
         log_w("Config manager initialized with defaults");
     }
     configManager.print();
 
-    // Initialize relay manager
     relayManager.begin();
     relayManager.allOff();
     log_i("All relays initialized OFF");
 
-    // Initialize sensors
     sensorManager = new SensorManager(configManager);
     if (!sensorManager->begin()) {
         log_w("Sensor manager initialized with fallbacks");
     }
 
-    // Initialize pump controllers
     AppConfig& cfg = configManager.get();
     phPumpCtrl = new PumpController(relayManager, cfg.phPump.relayChannel, "pH Pump");
     chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump");
@@ -307,31 +299,24 @@ void setup() {
     chlorinePumpCtrl->setMinOnTime(cfg.chlorinePID.minOnTimeSec * 1000);
     chlorinePumpCtrl->setMinOffTime(cfg.chlorinePID.minOffTimeSec * 1000);
 
-    // Initialize filter pump logic
     FilterPumpConfig& fpCfg = cfg.filterPump;
     PumpController* filterPumpCtrl = new PumpController(relayManager, fpCfg.relayChannel, "Filter Pump");
     filterPumpCtrl->begin();
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
     filterPumpLogic->begin();
 
-    // Initialize chemistry controller
     chemistryController = new PoolChemistryController(configManager, *sensorManager,
                                                        *phPumpCtrl, *chlorinePumpCtrl);
     chemistryController->begin();
 
-    // Initialize WiFi
     setupWiFi();
-
-    // Setup web server (always, even in AP mode)
     setupWebServer();
 
-    // Initialize NTP
     if (wifiConnected) {
-        ntpSynced = initNTP(7200, 3600);      // Europe/Berlin (CET=UTC+1, CEST=UTC+2)
+        ntpSynced = initNTP(7200, 3600);
         ntpSynced = waitForNTPSync(15);
     }
 
-    // Initialize MQTT
     mqttManager = new MQTTManager(configManager);
     mqttManager->begin();
     mqttManager->setCommandCallback(handleMQTTCommand);
@@ -346,37 +331,28 @@ void setup() {
 void loop() {
     unsigned long loopStart = millis();
 
-    // 1. Feed watchdog
     feedWatchdog();
-
-    // 2. Maintain WiFi connection
     maintainWiFi();
 
-    // 3. Handle MQTT
     if (mqttManager) {
         mqttManager->loop();
     }
 
-    // 4. Handle web server
     webServer.handleClient();
 
-    // 5. Update sensors
     if (sensorManager) {
         sensorManager->update();
     }
 
-    // 6. Run pool chemistry control
     if (chemistryController && systemReady) {
         chemistryController->update();
     }
 
-    // 7. Run filter pump logic
     if (filterPumpLogic && sensorManager) {
         float waterTemp = sensorManager->getWaterTemperature();
         filterPumpLogic->update(waterTemp);
     }
 
-    // 8. Publish MQTT states periodically
     if (mqttManager && systemReady) {
         unsigned long now = millis();
         if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
@@ -386,7 +362,6 @@ void loop() {
             String chemistryState = chemistryController ? chemistryController->getStateJSON() : "{}";
             String filterState = filterPumpLogic ? filterPumpLogic->getStateJSON() : "{}";
 
-            // Collect pump states
             StaticJsonDocument<512> pumpDoc;
             if (phPumpCtrl) {
                 JsonObject ph = pumpDoc.createNestedObject("ph_pump");
@@ -407,7 +382,6 @@ void loop() {
 
             mqttManager->publishState(sensorStates, chemistryState, filterState, pumpStates);
 
-            // Publish relay states
             StaticJsonDocument<256> relayDoc;
             for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
                 String key = "relay_" + String(i);
@@ -419,14 +393,12 @@ void loop() {
         }
     }
 
-    // 9. Delay to maintain loop rate
     AppConfig& cfg = configManager.get();
     unsigned long elapsed = millis() - loopStart;
     int delayMs = cfg.loopDelayMs - (int)elapsed;
     if (delayMs > 0) {
         delay(delayMs);
     } else if (delayMs < -100) {
-        // Loop took too long — warn
         static unsigned long lastWarn = 0;
         if (millis() - lastWarn > 60000) {
             log_w("Loop took %lu ms (max %d)", elapsed, cfg.loopDelayMs);
@@ -434,8 +406,6 @@ void loop() {
         }
     }
 }
-
-// ─── Error Handler ───────────────────────────────────────────────────
 
 void resetByWatchdog() {
     log_e("Watchdog triggered! Resetting...");
@@ -446,4 +416,3 @@ void resetByWatchdog() {
     delay(500);
     ESP.restart();
 }
-

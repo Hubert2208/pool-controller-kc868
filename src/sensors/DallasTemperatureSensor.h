@@ -7,9 +7,6 @@
 
 class DallasTemperatureSensor : public SensorBase {
 public:
-    // oneWirePin: GPIO pin for the OneWire bus
-    // sensorIndex: which sensor on the bus (0 = first)
-    // sensorLabel: "Water Temperature" or "Air Temperature"
     DallasTemperatureSensor(uint8_t oneWirePin, uint8_t sensorIndex = 0, const char* sensorLabel = "Water Temperature");
 
     bool begin() override;
@@ -19,7 +16,6 @@ public:
     const char* getUnit() const override { return "°C"; }
     bool isConnected() const override { return _connected; }
 
-    // Get address of the sensor on the bus
     const uint8_t* getAddress() const { return _address; }
 
 private:
