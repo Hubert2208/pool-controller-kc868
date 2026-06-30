@@ -271,7 +271,11 @@ void setup() {
     log_i("ESP32 @ %d MHz", getCpuFrequencyMhz());
     log_i("Free heap: %u bytes", ESP.getFreeHeap());
 
-    esp_task_wdt_init(30, true);
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 30000,
+        .trigger_panic = true,
+    };
+    esp_task_wdt_init(&twdt_config);
     esp_task_wdt_add(NULL);
 
     if (!configManager.begin()) {
