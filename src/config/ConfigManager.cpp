@@ -1,4 +1,5 @@
 #include "ConfigManager.h"
+#include "ConfigDefaults.h"
 
 // ─── Serialization helpers ────────────────────────────────────────────
 
@@ -340,54 +341,7 @@ ConfigManager::ConfigManager() {}
 
 void ConfigManager::setDefaults() {
     _config = AppConfig();
-
-    const char* relayNames[MAX_RELAYS] = {
-        "Filter Pumpe", "pH Pumpe", "Chlor Pumpe",
-        "Relay 4", "Relay 5", "Relay 6",
-        "Relay 7", "Relay 8"
-    };
-    for (int i = 0; i < MAX_RELAYS; i++) {
-        _config.relays[i].channel = i;
-        _config.relays[i].name = relayNames[i];
-        _config.relays[i].normallyOpen = true;
-        _config.relays[i].maxOnTimeSec = 0;
-    }
-    _config.relayCount = MAX_RELAYS;
-
-    _config.phPump.relayChannel = 1;
-    _config.chlorinePump.relayChannel = 2;
-    _config.filterPump.relayChannel = 0;
-
-    _config.phSensor.simMin = 6.8;
-    _config.phSensor.simMax = 7.6;
-    _config.phSensor.simDriftPerHour = 0.05;
-
-    _config.orpSensor.simMin = 200.0;
-    _config.orpSensor.simMax = 800.0;
-    _config.orpSensor.simDriftPerHour = 10.0;
-
-    _config.tempAirSensor.simMin = 10.0;
-    _config.tempAirSensor.simMax = 40.0;
-    _config.tempWaterSensor.simMin = 5.0;
-    _config.tempWaterSensor.simMax = 35.0;
-
-    _config.pressureSensor.simMin = 0.0;
-    _config.pressureSensor.simMax = 2.5;
-    _config.pressureSensor.simDriftPerHour = 0.1;
-
-    _config.phPID.kp = 1.2;
-    _config.phPID.ki = 0.08;
-    _config.phPID.kd = 0.04;
-    _config.phPID.setpoint = 7.2;
-    _config.phPID.minOnTimeSec = 15;
-    _config.phPID.minOffTimeSec = 60;
-
-    _config.chlorinePID.kp = 0.8;
-    _config.chlorinePID.ki = 0.05;
-    _config.chlorinePID.kd = 0.02;
-    _config.chlorinePID.setpoint = 650.0;
-    _config.chlorinePID.minOnTimeSec = 30;
-    _config.chlorinePID.minOffTimeSec = 120;
+    SetDefaults::apply(_config);
 }
 
 bool ConfigManager::begin() {
