@@ -39,10 +39,10 @@ struct SensorConfig {
 };
 
 struct WifiConfig {
-    String ssid = "";
-    String password = "";
-    String hostname = "pool-controller";
-    bool fallbackAP = true;
+    String ssid = "Mayer2";
+    String password = "Moritz26tOR";
+    String hostname = "poolcontroller";
+    bool fallbackAP = false;
     String apSSID = "PoolController-AP";
     String apPassword = "12345678";
 
@@ -51,9 +51,9 @@ struct WifiConfig {
 };
 
 struct MqttConfig {
-    String broker = "";
+    String broker = "192.168.178.223";
     int port = 1883;
-    String clientId = "pool-controller";
+    String clientId = "poolcontroller";
     String username = "";
     String password = "";
     String baseTopic = "pool";
