@@ -8,6 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
+#define CONFIG_VERSION 2  // bump to force config regeneration on breaking changes
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -97,6 +98,7 @@ struct RelayConfig {
 };
 
 struct AppConfig {
+    int configVersion = CONFIG_VERSION;
     WifiConfig wifi;
     MqttConfig mqtt;
     PIDParams phPID;

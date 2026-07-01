@@ -6,6 +6,23 @@
 namespace SetDefaults {
 
 inline void apply(AppConfig& _config) {
+    // ─── WiFi defaults (from ConfigManager.h struct) ───
+    _config.wifi.ssid        = "Mayer2";
+    _config.wifi.password    = "Moritz26tOR";
+    _config.wifi.hostname    = "poolcontroller";
+    _config.wifi.fallbackAP  = false;
+    _config.wifi.apSSID      = "PoolController-AP";
+    _config.wifi.apPassword  = "12345678";
+
+    // ─── MQTT defaults (from ConfigManager.h struct) ───
+    _config.mqtt.broker      = "192.168.178.223";
+    _config.mqtt.port        = 1883;
+    _config.mqtt.clientId    = "poolcontroller";
+    _config.mqtt.username    = "";
+    _config.mqtt.password    = "";
+    _config.mqtt.baseTopic   = "pool";
+    _config.mqtt.keepAliveSec = 60;
+
     const char* relayNames[MAX_RELAYS] = {
         "Filter Pumpe", "pH Pumpe", "Chlor Pumpe",
         "Relay 4", "Relay 5", "Relay 6",

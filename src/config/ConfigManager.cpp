@@ -296,6 +296,7 @@ String AppConfig::toJson() const {
         r["maxOnTimeSec"] = relays[i].maxOnTimeSec;
     }
 
+    doc["configVersion"] = CONFIG_VERSION;
     doc["relayCount"] = relayCount;
     doc["logLevel"] = logLevel;
     doc["loopDelayMs"] = loopDelayMs;
@@ -320,6 +321,7 @@ AppConfig AppConfig::fromJson(const JsonDocument& doc) {
     cfg.chlorinePump = PumpConfig::fromJson(doc["chlorinePump"]);
     cfg.filterPump = FilterPumpConfig::fromJson(doc["filterPump"]);
 
+    cfg.configVersion = doc["configVersion"] | 0;
     cfg.relayCount = doc["relayCount"] | 0;
     if (doc["relays"].is<JsonArray>()) {
         JsonArrayConst arr = doc["relays"].as<JsonArrayConst>();
@@ -382,6 +384,14 @@ bool ConfigManager::loadFromLittleFS() {
     }
 
     _config = AppConfig::fromJson(doc);
+
+    // Check if saved config version matches current code version
+    if (_config.configVersion != CONFIG_VERSION) {
+        log_w("Config version mismatch (saved=%d, code=%d), regenerating",
+              _config.configVersion, CONFIG_VERSION);
+        return false;  // triggers setDefaults() + save
+    }
+
     return true;
 }
 
