@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 2  // bump to force config regeneration on breaking changes
+#define CONFIG_VERSION 3  // bump to force config regeneration on breaking changes
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -76,8 +76,8 @@ struct PumpConfig {
 
 struct FilterPumpConfig {
     int relayChannel = 0;
-    float tempSlope = -7.5;
-    float tempIntercept = 300.0;
+    float tempSlope = 8.0;    // warmer water → more filtration (min/day per °C)
+    float tempIntercept = -40.0; // baseline offset
     String windowStart = "07:00";
     String windowEnd = "21:00";
     int minCycleMinutes = 60;
@@ -117,7 +117,7 @@ struct AppConfig {
     int loopDelayMs = 100;
 
     String toJson() const;
-    static AppConfig fromJson(const JsonDocument& doc);
+    static AppConfig fromJson(JsonVariantConst json);
 };
 
 class ConfigManager {
