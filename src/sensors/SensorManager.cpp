@@ -51,6 +51,7 @@ bool SensorManager::begin() {
     if (_phSensor && _phSensor->begin()) {
         _sensors.push_back(_phSensor);
         _sensorCount++;
+        _phSensor->setUpdateIntervalMs(cfg.phSensor.updateIntervalMs);
         log_i("pH sensor initialized");
     } else {
         delete _phSensor;
@@ -62,6 +63,7 @@ bool SensorManager::begin() {
     if (_orpSensor && _orpSensor->begin()) {
         _sensors.push_back(_orpSensor);
         _sensorCount++;
+        _orpSensor->setUpdateIntervalMs(cfg.orpSensor.updateIntervalMs);
         log_i("ORP sensor initialized");
     } else {
         delete _orpSensor;
@@ -73,6 +75,7 @@ bool SensorManager::begin() {
     if (_waterTempSensor && _waterTempSensor->begin()) {
         _sensors.push_back(_waterTempSensor);
         _sensorCount++;
+        _waterTempSensor->setUpdateIntervalMs(cfg.tempWaterSensor.updateIntervalMs);
         log_i("Water temp sensor initialized");
     } else {
         delete _waterTempSensor;
@@ -84,6 +87,7 @@ bool SensorManager::begin() {
     if (_airTempSensor && _airTempSensor->begin()) {
         _sensors.push_back(_airTempSensor);
         _sensorCount++;
+        _airTempSensor->setUpdateIntervalMs(cfg.tempAirSensor.updateIntervalMs);
         log_i("Air temp sensor initialized");
     } else {
         delete _airTempSensor;
@@ -95,6 +99,7 @@ bool SensorManager::begin() {
     if (_pressureSensor && _pressureSensor->begin()) {
         _sensors.push_back(_pressureSensor);
         _sensorCount++;
+        _pressureSensor->setUpdateIntervalMs(cfg.pressureSensor.updateIntervalMs);
         log_i("Pressure sensor initialized");
     } else {
         delete _pressureSensor;
@@ -131,7 +136,7 @@ void SensorManager::update() {
     if (_sensorCount > 0 && (now - _lastUpdate >= cfg.loopDelayMs)) {
         SensorBase* s = _sensors[_currentSensorIndex];
         if (s->isEnabled()) {
-            if (now - s->lastReadTime() >= (unsigned long)cfg.phSensor.updateIntervalMs) {
+            if (now - s->lastReadTime() >= (unsigned long)s->updateIntervalMs()) {
                 s->read();
             }
         }
