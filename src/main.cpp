@@ -73,11 +73,12 @@ WebServer webServer(80);
 
 // ─── Helper: button HTML ──────────────────────────────────────────────
 
-String pumpButton(const char* id, const char* label, bool state) {
+String pumpButton(const char* id, const char* label, bool state, unsigned long runMins, unsigned long dayMins) {
     String cls = state ? "btn-on" : "btn-off";
     String txt = state ? "ON" : "OFF";
     String out = "<span class='pump-label'>" + String(label) + ":</span> ";
     out += "<button class='pump-btn " + cls + "' id='btn-" + String(id) + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
+    out += " <span class='runtime' id='run-" + String(id) + "'>(" + String(state ? String(runMins) : "0") + "m / " + String(dayMins) + "m today)</span>";
     return out;
 }
 
@@ -101,6 +102,7 @@ void handleRoot() {
     html += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
     html += ".relay-btn{font-size:0.75em;padding:4px 8px;margin:2px;min-width:52px}";
     html += ".pump-label{display:inline-block;width:100px}";
+    html += ".runtime{color:#888;font-size:0.75em;margin-left:6px}";
     html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}";
@@ -108,7 +110,7 @@ void handleRoot() {
     html += "</style>";
     html += "</head><body><h1>🏊 Pool Controller</h1>";
 
-    // System status (with auto-refresh targets)
+    // System status
     html += "<div class='card'><h2>System</h2>";
     html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
     html += "<p>Uptime: <span id='sys-uptime'>" + String(millis() / 1000 / 60) + "</span> min | ";
@@ -117,7 +119,7 @@ void handleRoot() {
     html += "IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p>";
     html += "</div>";
 
-    // Sensor readings (with auto-refresh targets)
+    // Sensor readings
     html += "<div class='card'><h2>Sensors</h2>";
     html += "<p id='sensor-row'>";
     if (sensorManager) {
@@ -145,13 +147,19 @@ void handleRoot() {
     // Pump controls
     html += "<div class='card'><h2>Pump Control</h2><p id='pump-row'>";
     if (filterPumpCtrl) {
-        html += pumpButton("filter", "Filter", filterPumpCtrl->isOn()) + "<br>";
+        html += pumpButton("filter", "Filter", filterPumpCtrl->isOn(),
+                          filterPumpCtrl->getLastOnDuration() / 60000,
+                          filterPumpCtrl->getRuntimeMinutes()) + "<br>";
     }
     if (phPumpCtrl) {
-        html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn()) + "<br>";
+        html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(),
+                          phPumpCtrl->getLastOnDuration() / 60000,
+                          phPumpCtrl->getRuntimeMinutes()) + "<br>";
     }
     if (chlorinePumpCtrl) {
-        html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn()) + "<br>";
+        html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(),
+                          chlorinePumpCtrl->getLastOnDuration() / 60000,
+                          chlorinePumpCtrl->getRuntimeMinutes()) + "<br>";
     }
     html += "</p></div>";
 
@@ -163,7 +171,7 @@ void handleRoot() {
     html += "</p><p style='font-size:0.7em;color:#888'>Direct relay control — bypasses pump logic. Use for hardware testing.</p>";
     html += "</div>";
 
-    // Chemistry status (read-only in manual)
+    // Chemistry status
     html += "<div class='card'><h2>Chemistry Status</h2>";
     html += "<p id='chem-row'>";
     if (chemistryController) {
@@ -178,28 +186,26 @@ void handleRoot() {
 
     // Auto-refresh script: poll /api every 5 seconds
     html += "<script>";
+    html += "function fmtMin(m){return m+'m';}";
     html += "setInterval(function(){";
     html += "fetch('/api').then(r=>r.json()).then(d=>{";
-    // Sensors
     html += "var el=document.getElementById('val-ph');if(el)el.textContent=d.ph.toFixed(2);";
     html += "el=document.getElementById('val-orp');if(el)el.textContent=d.orp.toFixed(0);";
     html += "el=document.getElementById('val-water');if(el)el.textContent=d.water_temp.toFixed(1);";
     html += "el=document.getElementById('val-air');if(el)el.textContent=d.air_temp.toFixed(1);";
     html += "el=document.getElementById('val-pressure');if(el)el.textContent=d.filter_pressure.toFixed(2);";
-    // System
     html += "el=document.getElementById('sys-uptime');if(el)el.textContent=Math.floor(d.uptime_ms/60000);";
     html += "el=document.getElementById('sys-wifi');if(el)el.textContent=d.wifi?'✅':'❌';";
     html += "el=document.getElementById('sys-mqtt');if(el)el.textContent=d.mqtt?'✅':'❌';";
-    // Mode badge
     html += "el=document.getElementById('sys-mode');";
     html += "if(el)el.innerHTML=d.manual_mode?'<span class=\"manual-badge\">🔧 MANUAL</span>':'<span class=\"auto-badge\">🤖 AUTO</span>';";
-    // Pump buttons
     html += "['filter','ph','chlorine'].forEach(function(id){";
-    html += "var b=document.getElementById('btn-'+id);if(b&&d.pumps){";
-    html += "var on=d.pumps[id];b.textContent=on?'ON':'OFF';";
-    html += "b.className='pump-btn '+(on?'btn-on':'btn-off');}}";
-    html += ");";
-    // Relay buttons
+    html += "var b=document.getElementById('btn-'+id);";
+    html += "var r=document.getElementById('run-'+id);";
+    html += "if(b&&d.pumps&&d.pumps[id]){";
+    html += "var p=d.pumps[id];var on=p.on;b.textContent=on?'ON':'OFF';";
+    html += "b.className='pump-btn '+(on?'btn-on':'btn-off');";
+    html += "if(r)r.textContent='('+(p.current_min?p.current_min:0)+'m / '+p.today_min+'m today)';}});";
     html += "if(d.relays)for(var i=0;i<d.relays.length;i++){";
     html += "var r=document.getElementById('rel-'+i);if(r){";
     html += "var on=d.relays[i];r.textContent='R'+i+': '+(on?'ON':'OFF');";
@@ -226,11 +232,26 @@ void handleAPI() {
     doc["air_temp"] = sensorManager ? sensorManager->getAirTemperature() : 0;
     doc["filter_pressure"] = sensorManager ? sensorManager->getFilterPressure() : 0;
 
-    // Pump states
+    // Pump states with runtime
     JsonObject pumps = doc.createNestedObject("pumps");
-    pumps["filter"] = filterPumpCtrl ? filterPumpCtrl->isOn() : false;
-    pumps["ph"] = phPumpCtrl ? phPumpCtrl->isOn() : false;
-    pumps["chlorine"] = chlorinePumpCtrl ? chlorinePumpCtrl->isOn() : false;
+    if (filterPumpCtrl) {
+        JsonObject f = pumps.createNestedObject("filter");
+        f["on"] = filterPumpCtrl->isOn();
+        f["current_min"] = filterPumpCtrl->getLastOnDuration() / 60000;
+        f["today_min"] = filterPumpCtrl->getRuntimeMinutes();
+    }
+    if (phPumpCtrl) {
+        JsonObject p = pumps.createNestedObject("ph");
+        p["on"] = phPumpCtrl->isOn();
+        p["current_min"] = phPumpCtrl->getLastOnDuration() / 60000;
+        p["today_min"] = phPumpCtrl->getRuntimeMinutes();
+    }
+    if (chlorinePumpCtrl) {
+        JsonObject c = pumps.createNestedObject("chlorine");
+        c["on"] = chlorinePumpCtrl->isOn();
+        c["current_min"] = chlorinePumpCtrl->getLastOnDuration() / 60000;
+        c["today_min"] = chlorinePumpCtrl->getRuntimeMinutes();
+    }
 
     // Relay states
     JsonArray relays = doc.createNestedArray("relays");
@@ -307,7 +328,6 @@ void handleAPIManualMode() {
     manualMode = (webServer.arg("mode") == "1" || webServer.arg("mode") == "true");
 
     if (!manualMode) {
-        // Returning to auto — restore normal state
         if (chemistryController) chemistryController->begin();
         log_i("Web: Switched to AUTO mode");
     } else {
@@ -492,7 +512,7 @@ void setup() {
     }
     configManager.print();
 
-    Wire.begin(4, 5);  // I2C for PCF8574 relay expander (must be before relay init)
+    Wire.begin(4, 5);
     relayManager.begin();
     relayManager.allOff();
     log_i("All relays initialized OFF");
@@ -519,7 +539,6 @@ void setup() {
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
     filterPumpLogic->begin();
 
-    // Interlock: pH and chlorine pumps require filter pump running
     filterPumpCtrl->addDependent(phPumpCtrl);
     filterPumpCtrl->addDependent(chlorinePumpCtrl);
 
@@ -543,8 +562,6 @@ void setup() {
     systemReady = true;
     log_i("═══ System ready (%lu ms) ═══", millis());
 }
-
-// ─── Arduino Loop ───────────────────────────────────────────────────
 
 void loop() {
     unsigned long loopStart = millis();
