@@ -489,6 +489,10 @@ void setup() {
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
     filterPumpLogic->begin();
 
+    // Interlock: pH and chlorine pumps require filter pump running
+    filterPumpCtrl->addDependent(phPumpCtrl);
+    filterPumpCtrl->addDependent(chlorinePumpCtrl);
+
     chemistryController = new PoolChemistryController(configManager, *sensorManager,
                                                        *phPumpCtrl, *chlorinePumpCtrl);
     chemistryController->begin();
