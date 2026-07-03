@@ -112,7 +112,7 @@ struct AppConfig {
     PumpConfig chlorinePump;
     FilterPumpConfig filterPump;
     RelayConfig relays[MAX_RELAYS];
-    int relayCount = 8;
+    int relayCount = 0;
     int logLevel = 1;
     int loopDelayMs = 100;
 
@@ -123,20 +123,19 @@ struct AppConfig {
 class ConfigManager {
 public:
     ConfigManager();
-    ~ConfigManager();
-
     bool begin();
-    void save();
-    AppConfig& get() { return _config; }
+    AppConfig& get();
+    bool save();
+    bool updateFromJson(const String& json);
+    String toJson();
     void print();
 
 private:
     AppConfig _config;
-    bool _initialized;
-
-    void loadDefaults();
+    void setDefaults();
     bool loadFromLittleFS();
     bool saveToLittleFS();
+    bool createDefaultConfig();
 };
 
 #endif // CONFIG_MANAGER_H
