@@ -30,6 +30,9 @@ public:
     bool isEnabled() const { return _enabled; }
     void setEnabled(bool e) { _enabled = e; }
 
+    void setUpdateIntervalMs(int ms) { _updateIntervalMs = ms; }
+    int updateIntervalMs() const { return _updateIntervalMs; }
+
     unsigned long lastReadTime() const { return _lastRead; }
 
 protected:
@@ -37,6 +40,7 @@ protected:
     bool _connected = false;
     float _value = 0.0f;
     unsigned long _lastRead = 0;
+    int _updateIntervalMs = 2000;
 };
 
 #endif // SENSOR_BASE_H
