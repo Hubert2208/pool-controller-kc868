@@ -1,22 +1,25 @@
 #include "RelayManager.h"
 
 RelayManager::RelayManager()
-    : _initialized(false)
+    : _state(0xFF)   // all bits 1 = all relays OFF (active-LOW)
+    , _initialized(false)
 {
-    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
-        _states[i] = false;
-    }
 }
 
 void RelayManager::begin() {
-    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
-        uint8_t pin = KC868_A8_RELAY_PINS[i];
-        pinMode(pin, OUTPUT);
-        digitalWrite(pin, LOW);  // Relays are active HIGH on KC868-A8
-        _states[i] = false;
-    }
+    Wire.beginTransmission(KC868_A8_PCF8574_ADDR);
+    Wire.write(0xFF);  // all relays off
+    Wire.endTransmission();
+    _state = 0xFF;
     _initialized = true;
-    log_i("Relay manager initialized (%d relays)", KC868_A8_RELAY_COUNT);
+    log_i("Relay manager initialized (PCF8574 @ 0x%02X, %d relays, active-LOW)",
+          KC868_A8_PCF8574_ADDR, KC868_A8_RELAY_COUNT);
+}
+
+void RelayManager::writePCF8574() {
+    Wire.beginTransmission(KC868_A8_PCF8574_ADDR);
+    Wire.write(_state);
+    Wire.endTransmission();
 }
 
 bool RelayManager::setRelay(uint8_t channel, bool state) {
@@ -25,33 +28,34 @@ bool RelayManager::setRelay(uint8_t channel, bool state) {
         return false;
     }
 
-    uint8_t pin = KC868_A8_RELAY_PINS[channel];
-    digitalWrite(pin, state ? HIGH : LOW);
-    _states[channel] = state;
+    if (state) {
+        // ON: clear the bit (active-LOW → 0 = relay energized)
+        _state &= ~(1 << channel);
+    } else {
+        // OFF: set the bit (1 = relay de-energized)
+        _state |= (1 << channel);
+    }
 
-    log_i("Relay %d (pin %d): %s", channel, pin, state ? "ON" : "OFF");
+    writePCF8574();
+
+    log_i("Relay %d: %s (PCF8574 byte=0x%02X)", channel, state ? "ON" : "OFF", _state);
     return true;
 }
 
 bool RelayManager::toggleRelay(uint8_t channel) {
     if (channel >= KC868_A8_RELAY_COUNT) return false;
-    bool newState = !_states[channel];
-    return setRelay(channel, newState);
+    bool currentState = !(_state & (1 << channel));  // bit=0 → ON
+    return setRelay(channel, !currentState);
 }
 
 bool RelayManager::getRelayState(uint8_t channel) const {
     if (channel >= KC868_A8_RELAY_COUNT) return false;
-    return _states[channel];
+    // bit is 0 when relay is ON (active-LOW)
+    return !(_state & (1 << channel));
 }
 
 void RelayManager::allOff() {
-    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
-        setRelay(i, false);
-    }
-    log_i("All relays turned off");
-}
-
-uint8_t RelayManager::getRelayPin(uint8_t channel) const {
-    if (channel >= KC868_A8_RELAY_COUNT) return 0;
-    return KC868_A8_RELAY_PINS[channel];
+    _state = 0xFF;  // all bits 1 = all off
+    writePCF8574();
+    log_i("All relays turned off (PCF8574)");
 }
