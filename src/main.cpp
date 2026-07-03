@@ -61,7 +61,7 @@ static int watchdogCount = 0;
 
 static const char* WIFI_HOSTNAME = "pool-controller";
 static const char* AP_SSID = "PoolController-AP";
-static const char* AP_PASSWORD = "12345678";
+static const char* AP_PASSWORD = "***";
 static const IPAddress AP_IP(192, 168, 4, 1);
 static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
@@ -462,6 +462,7 @@ void setup() {
     }
     configManager.print();
 
+    Wire.begin(4, 5);  // I2C for PCF8574 relay expander (must be before relay init)
     relayManager.begin();
     relayManager.allOff();
     log_i("All relays initialized OFF");

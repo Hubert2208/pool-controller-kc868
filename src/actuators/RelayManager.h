@@ -2,49 +2,48 @@
 #define RELAY_MANAGER_H
 
 #include <Arduino.h>
+#include <Wire.h>
 
 #define KC868_A8_RELAY_COUNT 8
+#define KC868_A8_PCF8574_ADDR 0x24  // PCF8574 I2C expander for relay control
 
-// Typical Kincony KC868-A8 GPIO to relay mapping
-static const uint8_t KC868_A8_RELAY_PINS[KC868_A8_RELAY_COUNT] = {
-    13,  // Relay 1  (Filter Pumpe)
-    14,  // Relay 2  (pH Pumpe)
-    15,  // Relay 3  (Chlor Pumpe)
-    16,  // Relay 4
-    17,  // Relay 5
-    18,  // Relay 6
-    19,  // Relay 7
-    21   // Relay 8
-};
-
+/**
+ * Relay Manager for KC868-A8.
+ *
+ * The KC868-A8 uses a PCF8574 I2C I/O expander at address 0x24 to
+ * control its 8 relays (not direct GPIO pins!). The relay driver
+ * circuit is active-LOW: writing 0 to a PCF8574 pin turns the relay ON,
+ * writing 1 turns it OFF. This matches the "inverted: true" setting in
+ * Kincony's official ESPHome YAML.
+ */
 class RelayManager {
 public:
     RelayManager();
     ~RelayManager() = default;
 
-    // Initialize all relay GPIOs, all OFF
+    // Initialize PCF8574, all relays off
     void begin();
 
-    // Set relay channel (0-7) to state (true=ON, false=OFF)
+    // Set relay state (true=ON, false=OFF)
     bool setRelay(uint8_t channel, bool state);
 
     // Toggle relay state
     bool toggleRelay(uint8_t channel);
 
-    // Get current state of relay channel
+    // Get relay state (true=ON, false=OFF)
     bool getRelayState(uint8_t channel) const;
 
     // Turn all relays off
     void allOff();
 
-    // Get number of relays
+    // Number of relays
     uint8_t getRelayCount() const { return KC868_A8_RELAY_COUNT; }
 
-    // Get GPIO pin for relay channel
-    uint8_t getRelayPin(uint8_t channel) const;
-
 private:
-    bool _states[KC868_A8_RELAY_COUNT];
+    // Write current state byte to PCF8574 over I2C
+    void writePCF8574();
+
+    uint8_t _state;      // current output byte (bit=0 → relay ON)
     bool _initialized;
 };
 
