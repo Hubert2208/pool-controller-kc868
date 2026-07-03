@@ -178,10 +178,6 @@ float SensorManager::getFilterPressure() const {
     return 0.0f;
 }
 
-float SensorManager::getHumidity() const {
-    return 0.0f;  // no humidity sensor
-}
-
 bool SensorManager::isPHConnected() const {
     return _phSensor && _phSensor->isConnected();
 }
