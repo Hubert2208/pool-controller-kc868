@@ -12,6 +12,8 @@ PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel,
     , _dailyRuntimeMs(0)
     , _lastDailyReset(0)
     , _initialized(false)
+    , _master(nullptr)
+    , _dependentCount(0)
 {
     strncpy(_name, name, sizeof(_name) - 1);
     _name[sizeof(_name) - 1] = '\0';
@@ -30,6 +32,12 @@ void PumpController::begin() {
 
 bool PumpController::turnOn() {
     if (!_initialized) return false;
+
+    // Interlock: this pump requires master to be running
+    if (_master && !_master->isOn()) {
+        log_w("Pump '%s' interlock blocked: '%s' not running", _name, _master->getName());
+        return false;
+    }
 
     unsigned long now = millis();
     unsigned long offDuration = now - _lastOffTime;
@@ -64,6 +72,7 @@ bool PumpController::turnOff() {
         _dailyRuntimeMs += onDuration;
         _lastOffTime = now;
         _cycleStartTime = 0;
+        forceOffDependents();
         return true;
     }
     return false;
@@ -79,6 +88,7 @@ bool PumpController::forceOff() {
         _dailyRuntimeMs += onDuration;
         _lastOffTime = now;
         _cycleStartTime = 0;
+        forceOffDependents();
         log_w("Pump '%s' force turned OFF", _name);
         return true;
     }
@@ -128,6 +138,30 @@ void PumpController::setMinOnTime(unsigned long ms) {
 
 void PumpController::setMinOffTime(unsigned long ms) {
     _minOffTimeMs = ms;
+}
+
+void PumpController::addDependent(PumpController* dep) {
+    if (_dependentCount < MAX_DEPENDENTS) {
+        _dependents[_dependentCount++] = dep;
+        dep->_master = this;
+        log_i("Pump '%s' added dependent '%s'", _name, dep->getName());
+    }
+}
+
+bool PumpController::hasDependentsOn() const {
+    for (int i = 0; i < _dependentCount; i++) {
+        if (_dependents[i]->isOn()) return true;
+    }
+    return false;
+}
+
+void PumpController::forceOffDependents() {
+    for (int i = 0; i < _dependentCount; i++) {
+        if (_dependents[i]->isOn()) {
+            log_i("Pump '%s' force-stopping dependent '%s'", _name, _dependents[i]->getName());
+            _dependents[i]->forceOff();
+        }
+    }
 }
 
 void PumpController::resetDailyRuntime() const {

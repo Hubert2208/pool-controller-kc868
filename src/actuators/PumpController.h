@@ -6,6 +6,8 @@
 
 class PumpController {
 public:
+    static const int MAX_DEPENDENTS = 4;
+
     PumpController(RelayManager& relayManager, uint8_t relayChannel, const char* name);
 
     void begin();
@@ -23,6 +25,11 @@ public:
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
     void resetDailyRuntime() const;
+
+    // Dependents: pumps that may only run when this pump is running.
+    // When this pump stops, all dependents are force-stopped.
+    void addDependent(PumpController* dep);
+    bool hasDependentsOn() const;
 
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }
@@ -43,6 +50,13 @@ private:
     mutable unsigned long _lastDailyReset;
 
     bool _initialized;
+
+    // Dependent pumps (must be ON for these to run)
+    PumpController* _master;             // this pump requires _master to be ON
+    PumpController* _dependents[MAX_DEPENDENTS]; // these pumps require THIS pump
+    int _dependentCount;
+
+    void forceOffDependents();
 
     void updateDailyReset() const;
 };
