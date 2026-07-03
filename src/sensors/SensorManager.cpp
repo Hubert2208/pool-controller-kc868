@@ -2,14 +2,13 @@
 #include "PHSensor.h"
 #include "ORPSensor.h"
 #include "DallasTemperatureSensor.h"
-#include "DHTSensor.h"
 #include "PressureSensor.h"
 
 // KC868-A8 I2C pins (default ESP32 I2C)
 #define I2C_SDA 4
 #define I2C_SCL 5
-#define DS18B20_ONE_WIRE_PIN 32
-#define DHT_PIN 33
+#define DS18B20_WATER_PIN 14
+#define DS18B20_AIR_PIN 13
 
 SensorManager::SensorManager(ConfigManager& configManager)
     : _config(configManager)
@@ -180,9 +179,7 @@ float SensorManager::getFilterPressure() const {
 }
 
 float SensorManager::getHumidity() const {
-    DHTSensor* dht = dynamic_cast<DHTSensor*>(_airTempSensor);
-    if (dht && dht->isConnected()) return dht->getHumidity();
-    return 50.0f;
+    return 0.0f;  // no humidity sensor
 }
 
 bool SensorManager::isPHConnected() const {
@@ -226,10 +223,6 @@ String SensorManager::getAllStateJSON() {
     at["value"] = getAirTemperature();
     at["unit"] = "°C";
 
-    JsonObject hum = doc.createNestedObject("humidity");
-    hum["value"] = getHumidity();
-    hum["unit"] = "%";
-
     JsonObject pres = doc.createNestedObject("filter_pressure");
     pres["value"] = getFilterPressure();
     pres["unit"] = "bar";
@@ -251,11 +244,11 @@ SensorBase* SensorManager::createORPSensor() {
 }
 
 SensorBase* SensorManager::createWaterTempSensor() {
-    return new DallasTemperatureSensor(DS18B20_ONE_WIRE_PIN, 0, "Water Temperature");
+    return new DallasTemperatureSensor(DS18B20_WATER_PIN, 0, "Water Temperature");
 }
 
 SensorBase* SensorManager::createAirTempSensor() {
-    return new DHTSensor(DHT_PIN, DHT22);
+    return new DallasTemperatureSensor(DS18B20_AIR_PIN, 0, "Air Temperature");
 }
 
 SensorBase* SensorManager::createPressureSensor() {

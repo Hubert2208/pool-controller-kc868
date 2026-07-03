@@ -28,7 +28,6 @@ public:
     float getWaterTemperature() const;
     float getAirTemperature() const;
     float getFilterPressure() const;
-    float getHumidity() const;
 
     bool isPHConnected() const;
     bool isORPConnected() const;

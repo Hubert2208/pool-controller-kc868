@@ -6,7 +6,7 @@
  *
  * Board: Kincony KC868-A8 (ESP32)
  * Relays: 0=Filter, 1=pH Pump, 2=Chlorine Pump
- * Sensors: pH (ADS1115 ch0), ORP (ADS1115 ch1), DS18B20, DHT22, Pressure (ADS1115 ch2)
+ * Sensors: pH (ADS1115 ch0), ORP (ADS1115 ch1), DS18B20 (water GPIO14, air GPIO13), Pressure (ADS1115 ch2)
  * Communication: MQTT, WiFi, Serial
  */
 
@@ -89,7 +89,6 @@ void handleRoot() {
         html += sensorManager->isORPConnected() ? " ✅" : " <span class='bad'>⚠ sim</span></p>";
         html += "<p>Water Temp: <span class='value'>" + String(sensorManager->getWaterTemperature(), 1) + "</span> <span class='unit'>°C</span></p>";
         html += "<p>Air Temp: <span class='value'>" + String(sensorManager->getAirTemperature(), 1) + "</span> <span class='unit'>°C</span></p>";
-        html += "<p>Humidity: <span class='value'>" + String(sensorManager->getHumidity(), 0) + "</span> <span class='unit'>%</span></p>";
         html += "<p>Filter Pressure: <span class='value'>" + String(sensorManager->getFilterPressure(), 2) + "</span> <span class='unit'>bar</span></p>";
         html += "</div>";
     }
