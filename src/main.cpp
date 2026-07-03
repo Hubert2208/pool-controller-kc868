@@ -77,14 +77,14 @@ String pumpButton(const char* id, const char* label, bool state) {
     String cls = state ? "btn-on" : "btn-off";
     String txt = state ? "ON" : "OFF";
     String out = "<span class='pump-label'>" + String(label) + ":</span> ";
-    out += "<button class='pump-btn " + cls + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
+    out += "<button class='pump-btn " + cls + "' id='btn-" + String(id) + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
     return out;
 }
 
 String relayButton(int channel, bool state) {
     String cls = state ? "btn-on" : "btn-off";
     String txt = state ? "ON" : "OFF";
-    String out = "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
+    String out = "<button class='relay-btn " + cls + "' id='rel-" + String(channel) + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
     return out;
 }
 
@@ -108,27 +108,28 @@ void handleRoot() {
     html += "</style>";
     html += "</head><body><h1>🏊 Pool Controller</h1>";
 
-    // System status
+    // System status (with auto-refresh targets)
     html += "<div class='card'><h2>System</h2>";
-    html += "<p>Mode: " + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</p>";
-    html += "<p>Uptime: " + String(millis() / 1000 / 60) + " min | ";
-    html += "WiFi: " + String(WiFi.isConnected() ? "✅" : "❌") + " | ";
-    html += "MQTT: " + String(mqttManager && mqttManager->isConnected() ? "✅" : "❌") + " | ";
+    html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
+    html += "<p>Uptime: <span id='sys-uptime'>" + String(millis() / 1000 / 60) + "</span> min | ";
+    html += "WiFi: <span id='sys-wifi'>" + String(WiFi.isConnected() ? "✅" : "❌") + "</span> | ";
+    html += "MQTT: <span id='sys-mqtt'>" + String(mqttManager && mqttManager->isConnected() ? "✅" : "❌") + "</span> | ";
     html += "IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p>";
     html += "</div>";
 
-    // Sensor readings
+    // Sensor readings (with auto-refresh targets)
+    html += "<div class='card'><h2>Sensors</h2>";
+    html += "<p id='sensor-row'>";
     if (sensorManager) {
-        html += "<div class='card'><h2>Sensors</h2><p>";
-        html += "pH: <span class='value'>" + String(sensorManager->getPH(), 2) + "</span> pH";
+        html += "pH: <span class='value' id='val-ph'>" + String(sensorManager->getPH(), 2) + "</span> pH";
         html += sensorManager->isPHConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| ORP: <span class='value'>" + String(sensorManager->getORP(), 0) + "</span> mV";
+        html += "| ORP: <span class='value' id='val-orp'>" + String(sensorManager->getORP(), 0) + "</span> mV";
         html += sensorManager->isORPConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| Water: <span class='value'>" + String(sensorManager->getWaterTemperature(), 1) + "</span>°C";
-        html += "| Air: <span class='value'>" + String(sensorManager->getAirTemperature(), 1) + "</span>°C";
-        html += "| Pressure: <span class='value'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
-        html += "</p></div>";
+        html += "| Water: <span class='value' id='val-water'>" + String(sensorManager->getWaterTemperature(), 1) + "</span>°C";
+        html += "| Air: <span class='value' id='val-air'>" + String(sensorManager->getAirTemperature(), 1) + "</span>°C";
+        html += "| Pressure: <span class='value' id='val-pressure'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
     }
+    html += "</p></div>";
 
     // Manual mode toggle
     html += "<div class='card'><h2>Control Mode</h2>";
@@ -142,7 +143,7 @@ void handleRoot() {
     html += "</div>";
 
     // Pump controls
-    html += "<div class='card'><h2>Pump Control</h2><p>";
+    html += "<div class='card'><h2>Pump Control</h2><p id='pump-row'>";
     if (filterPumpCtrl) {
         html += pumpButton("filter", "Filter", filterPumpCtrl->isOn()) + "<br>";
     }
@@ -155,7 +156,7 @@ void handleRoot() {
     html += "</p></div>";
 
     // Individual relay test
-    html += "<div class='card'><h2>Relay Test (Direct)</h2><p>";
+    html += "<div class='card'><h2>Relay Test (Direct)</h2><p id='relay-row'>";
     for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
         html += relayButton(i, relayManager.getRelayState(i));
     }
@@ -164,19 +165,48 @@ void handleRoot() {
 
     // Chemistry status (read-only in manual)
     html += "<div class='card'><h2>Chemistry Status</h2>";
+    html += "<p id='chem-row'>";
     if (chemistryController) {
-        html += "<p>pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
-        html += "<p>Chlorine Ctrl: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
+        html += "pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF");
     }
-    html += "<p>pH Pump: " + String(phPumpCtrl && phPumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
-    html += "<p>Chlorine Pump: " + String(chlorinePumpCtrl && chlorinePumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
-    html += "<p>Filter Pump: " + String(filterPumpCtrl && filterPumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
-    html += "</div>";
+    html += "</p></div>";
 
     // Actions
     html += "<div class='card'><h2>Quick Actions</h2><p>";
     html += "<a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a>";
     html += "</p></div>";
+
+    // Auto-refresh script: poll /api every 5 seconds
+    html += "<script>";
+    html += "setInterval(function(){";
+    html += "fetch('/api').then(r=>r.json()).then(d=>{";
+    // Sensors
+    html += "var el=document.getElementById('val-ph');if(el)el.textContent=d.ph.toFixed(2);";
+    html += "el=document.getElementById('val-orp');if(el)el.textContent=d.orp.toFixed(0);";
+    html += "el=document.getElementById('val-water');if(el)el.textContent=d.water_temp.toFixed(1);";
+    html += "el=document.getElementById('val-air');if(el)el.textContent=d.air_temp.toFixed(1);";
+    html += "el=document.getElementById('val-pressure');if(el)el.textContent=d.filter_pressure.toFixed(2);";
+    // System
+    html += "el=document.getElementById('sys-uptime');if(el)el.textContent=Math.floor(d.uptime_ms/60000);";
+    html += "el=document.getElementById('sys-wifi');if(el)el.textContent=d.wifi?'✅':'❌';";
+    html += "el=document.getElementById('sys-mqtt');if(el)el.textContent=d.mqtt?'✅':'❌';";
+    // Mode badge
+    html += "el=document.getElementById('sys-mode');";
+    html += "if(el)el.innerHTML=d.manual_mode?'<span class=\"manual-badge\">🔧 MANUAL</span>':'<span class=\"auto-badge\">🤖 AUTO</span>';";
+    // Pump buttons
+    html += "['filter','ph','chlorine'].forEach(function(id){";
+    html += "var b=document.getElementById('btn-'+id);if(b&&d.pumps){";
+    html += "var on=d.pumps[id];b.textContent=on?'ON':'OFF';";
+    html += "b.className='pump-btn '+(on?'btn-on':'btn-off');}}";
+    html += ");";
+    // Relay buttons
+    html += "if(d.relays)for(var i=0;i<d.relays.length;i++){";
+    html += "var r=document.getElementById('rel-'+i);if(r){";
+    html += "var on=d.relays[i];r.textContent='R'+i+': '+(on?'ON':'OFF');";
+    html += "r.className='relay-btn '+(on?'btn-on':'btn-off');}}";
+    html += "}).catch(function(){});";
+    html += "},5000);";
+    html += "</script>";
 
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p>";
     html += "</body></html>";
