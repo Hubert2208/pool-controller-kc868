@@ -24,6 +24,10 @@ public:
     void setMinOffTime(unsigned long ms);
     void resetDailyRuntime() const;
 
+    // Interlock: this pump may only start when _interlock pump is running
+    void setInterlock(PumpController* interlock) { _interlock = interlock; }
+    PumpController* getInterlock() const { return _interlock; }
+
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }
 
@@ -42,6 +46,7 @@ private:
     mutable unsigned long _dailyRuntimeMs;
     mutable unsigned long _lastDailyReset;
 
+    PumpController* _interlock;   // dependency pump (must be ON to allow start)
     bool _initialized;
 
     void updateDailyReset() const;

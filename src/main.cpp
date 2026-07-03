@@ -73,11 +73,13 @@ WebServer webServer(80);
 
 // ─── Helper: button HTML ──────────────────────────────────────────────
 
-String pumpButton(const char* id, const char* label, bool state) {
+String pumpButton(const char* id, const char* label, bool state, unsigned long runtimeMinutes, unsigned long dailyMinutes, bool interlockBlocked) {
     String cls = state ? "btn-on" : "btn-off";
     String txt = state ? "ON" : "OFF";
     String out = "<span class='pump-label'>" + String(label) + ":</span> ";
     out += "<button class='pump-btn " + cls + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
+    out += " <span class='runtime'>⏱ " + String(runtimeMinutes) + "m (day: " + String(dailyMinutes) + "m)</span>";
+    if (interlockBlocked) out += " <span class='bad'>🔒 interlock</span>";
     return out;
 }
 
@@ -101,6 +103,7 @@ void handleRoot() {
     html += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
     html += ".relay-btn{font-size:0.75em;padding:4px 8px;margin:2px;min-width:52px}";
     html += ".pump-label{display:inline-block;width:100px}";
+    html += ".runtime{color:#888;font-size:0.8em;margin-left:6px}";
     html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}";
@@ -144,13 +147,22 @@ void handleRoot() {
     // Pump controls
     html += "<div class='card'><h2>Pump Control</h2><p>";
     if (filterPumpCtrl) {
-        html += pumpButton("filter", "Filter", filterPumpCtrl->isOn()) + "<br>";
+        bool blocked = false;
+        html += pumpButton("filter", "Filter", filterPumpCtrl->isOn(),
+                          filterPumpCtrl->getLastOnDuration() / 60000,
+                          filterPumpCtrl->getRuntimeMinutes(), blocked) + "<br>";
     }
     if (phPumpCtrl) {
-        html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn()) + "<br>";
+        bool blocked = phPumpCtrl->getInterlock() && !phPumpCtrl->getInterlock()->isOn();
+        html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(),
+                          phPumpCtrl->getLastOnDuration() / 60000,
+                          phPumpCtrl->getRuntimeMinutes(), blocked) + "<br>";
     }
     if (chlorinePumpCtrl) {
-        html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn()) + "<br>";
+        bool blocked = chlorinePumpCtrl->getInterlock() && !chlorinePumpCtrl->getInterlock()->isOn();
+        html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(),
+                          chlorinePumpCtrl->getLastOnDuration() / 60000,
+                          chlorinePumpCtrl->getRuntimeMinutes(), blocked) + "<br>";
     }
     html += "</p></div>";
 
@@ -488,6 +500,11 @@ void setup() {
     filterPumpCtrl->begin();
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
     filterPumpLogic->begin();
+
+    // Interlock: pH and chlorine pumps require filter pump running
+    phPumpCtrl->setInterlock(filterPumpCtrl);
+    chlorinePumpCtrl->setInterlock(filterPumpCtrl);
+    log_i("Interlock set: pH/chlorine pumps require filter pump");
 
     chemistryController = new PoolChemistryController(configManager, *sensorManager,
                                                        *phPumpCtrl, *chlorinePumpCtrl);
