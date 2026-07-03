@@ -40,7 +40,7 @@ void FilterPumpLogic::update(float waterTemperature) {
 float FilterPumpLogic::calculateDailyRuntime(float waterTemp) const {
     FilterPumpConfig& cfg = _config.get().filterPump;
 
-    // Linear model: colder water needs more filtration
+    // Linear model: warmer water needs more filtration (algae/bacteria growth)
     float runtime = cfg.tempSlope * waterTemp + cfg.tempIntercept;
 
     // Clamp to reasonable range

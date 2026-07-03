@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 2  // bump to force config regeneration on breaking changes
+#define CONFIG_VERSION 3  // bump to force config regeneration on breaking changes
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -76,8 +76,8 @@ struct PumpConfig {
 
 struct FilterPumpConfig {
     int relayChannel = 0;
-    float tempSlope = -7.5;
-    float tempIntercept = 300.0;
+    float tempSlope = 8.0;    // warmer water → more filtration (min/day per °C)
+    float tempIntercept = -40.0; // baseline offset
     String windowStart = "07:00";
     String windowEnd = "21:00";
     int minCycleMinutes = 60;
@@ -112,30 +112,31 @@ struct AppConfig {
     PumpConfig chlorinePump;
     FilterPumpConfig filterPump;
     RelayConfig relays[MAX_RELAYS];
-    int relayCount = 0;
+    int relayCount = 8;
     int logLevel = 1;
     int loopDelayMs = 100;
 
     String toJson() const;
-    static AppConfig fromJson(const JsonDocument& doc);
+    static AppConfig fromJson(JsonVariantConst json);
 };
 
 class ConfigManager {
 public:
     ConfigManager();
+    ~ConfigManager();
+
     bool begin();
-    AppConfig& get();
-    bool save();
-    bool updateFromJson(const String& json);
-    String toJson();
+    void save();
+    AppConfig& get() { return _config; }
     void print();
 
 private:
     AppConfig _config;
-    void setDefaults();
+    bool _initialized;
+
+    void loadDefaults();
     bool loadFromLittleFS();
     bool saveToLittleFS();
-    bool createDefaultConfig();
 };
 
 #endif // CONFIG_MANAGER_H
