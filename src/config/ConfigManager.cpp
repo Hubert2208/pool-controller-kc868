@@ -306,25 +306,25 @@ String AppConfig::toJson() const {
     return out;
 }
 
-AppConfig AppConfig::fromJson(const JsonDocument& doc) {
+AppConfig AppConfig::fromJson(JsonVariantConst json) {
     AppConfig cfg;
-    cfg.wifi = WifiConfig::fromJson(doc["wifi"]);
-    cfg.mqtt = MqttConfig::fromJson(doc["mqtt"]);
-    cfg.phPID = PIDParams::fromJson(doc["phPID"]);
-    cfg.chlorinePID = PIDParams::fromJson(doc["chlorinePID"]);
-    cfg.phSensor = SensorConfig::fromJson(doc["phSensor"]);
-    cfg.orpSensor = SensorConfig::fromJson(doc["orpSensor"]);
-    cfg.tempAirSensor = SensorConfig::fromJson(doc["tempAirSensor"]);
-    cfg.tempWaterSensor = SensorConfig::fromJson(doc["tempWaterSensor"]);
-    cfg.pressureSensor = SensorConfig::fromJson(doc["pressureSensor"]);
-    cfg.phPump = PumpConfig::fromJson(doc["phPump"]);
-    cfg.chlorinePump = PumpConfig::fromJson(doc["chlorinePump"]);
-    cfg.filterPump = FilterPumpConfig::fromJson(doc["filterPump"]);
+    cfg.wifi = WifiConfig::fromJson(json["wifi"]);
+    cfg.mqtt = MqttConfig::fromJson(json["mqtt"]);
+    cfg.phPID = PIDParams::fromJson(json["phPID"]);
+    cfg.chlorinePID = PIDParams::fromJson(json["chlorinePID"]);
+    cfg.phSensor = SensorConfig::fromJson(json["phSensor"]);
+    cfg.orpSensor = SensorConfig::fromJson(json["orpSensor"]);
+    cfg.tempAirSensor = SensorConfig::fromJson(json["tempAirSensor"]);
+    cfg.tempWaterSensor = SensorConfig::fromJson(json["tempWaterSensor"]);
+    cfg.pressureSensor = SensorConfig::fromJson(json["pressureSensor"]);
+    cfg.phPump = PumpConfig::fromJson(json["phPump"]);
+    cfg.chlorinePump = PumpConfig::fromJson(json["chlorinePump"]);
+    cfg.filterPump = FilterPumpConfig::fromJson(json["filterPump"]);
 
-    cfg.configVersion = doc["configVersion"] | 0;
-    cfg.relayCount = doc["relayCount"] | 0;
-    if (doc["relays"].is<JsonArray>()) {
-        JsonArrayConst arr = doc["relays"].as<JsonArrayConst>();
+    cfg.configVersion = json["configVersion"] | 0;
+    cfg.relayCount = json["relayCount"] | 0;
+    if (json["relays"].is<JsonArray>()) {
+        JsonArrayConst arr = json["relays"].as<JsonArrayConst>();
         int count = min((int)arr.size(), MAX_RELAYS);
         for (int i = 0; i < count; i++) {
             cfg.relays[i] = RelayConfig::fromJson(arr[i]);
@@ -332,8 +332,8 @@ AppConfig AppConfig::fromJson(const JsonDocument& doc) {
         cfg.relayCount = count;
     }
 
-    cfg.logLevel = doc["logLevel"] | cfg.logLevel;
-    cfg.loopDelayMs = doc["loopDelayMs"] | cfg.loopDelayMs;
+    cfg.logLevel = json["logLevel"] | cfg.logLevel;
+    cfg.loopDelayMs = json["loopDelayMs"] | cfg.loopDelayMs;
     return cfg;
 }
 
@@ -383,7 +383,7 @@ bool ConfigManager::loadFromLittleFS() {
         return false;
     }
 
-    _config = AppConfig::fromJson(doc);
+    _config = AppConfig::fromJson(doc.as<JsonVariantConst>());
 
     // Check if saved config version matches current code version
     if (_config.configVersion != CONFIG_VERSION) {
