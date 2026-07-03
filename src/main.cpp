@@ -37,9 +37,14 @@ RelayManager relayManager;
 SensorManager* sensorManager = nullptr;
 PumpController* phPumpCtrl = nullptr;
 PumpController* chlorinePumpCtrl = nullptr;
+PumpController* filterPumpCtrl = nullptr;
 FilterPumpLogic* filterPumpLogic = nullptr;
 PoolChemistryController* chemistryController = nullptr;
 MQTTManager* mqttManager = nullptr;
+
+// ─── Manual Override Mode ────────────────────────────────────────────
+
+static bool manualMode = false;
 
 // ─── Timing & Status ──────────────────────────────────────────────────
 
@@ -61,56 +66,119 @@ static const IPAddress AP_IP(192, 168, 4, 1);
 static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
 
-// ─── Web Server (minimal status page) ─────────────────────────────────
+// ─── Web Server ───────────────────────────────────────────────────────
 
 #include <WebServer.h>
 WebServer webServer(80);
 
+// ─── Helper: button HTML ──────────────────────────────────────────────
+
+String pumpButton(const char* id, const char* label, bool state) {
+    String cls = state ? "btn-on" : "btn-off";
+    String txt = state ? "ON" : "OFF";
+    String out = "<span class='pump-label'>" + String(label) + ":</span> ";
+    out += "<button class='pump-btn " + cls + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
+    return out;
+}
+
+String relayButton(int channel, bool state) {
+    String cls = state ? "btn-on" : "btn-off";
+    String txt = state ? "ON" : "OFF";
+    String out = "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
+    return out;
+}
+
 void handleRoot() {
     String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
     html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<style>body{font-family:Arial,sans-serif;margin:20px;background:#1a1a2e;color:#eee}";
-    html += "h1{color:#0f0}h2{color:#0af}.card{background:#16213e;border-radius:8px;padding:15px;margin:10px 0}";
-    html += ".value{font-size:1.5em;font-weight:bold;color:#0f0}.unit{color:#888}.bad{color:#f44}.ok{color:#0f0}</style>";
+    html += "<style>";
+    html += "body{font-family:Arial,sans-serif;margin:10px;background:#1a1a2e;color:#eee}";
+    html += "h1{color:#0f0;font-size:1.3em;margin:8px 0}h2{color:#0af;font-size:1em;margin:6px 0}";
+    html += ".card{background:#16213e;border-radius:8px;padding:12px;margin:8px 0}";
+    html += ".value{font-size:1.3em;font-weight:bold;color:#0f0}.unit{color:#888}.bad{color:#f44}";
+    html += ".btn-on{background:#0a0;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
+    html += ".btn-off{background:#444;color:#ccc;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
+    html += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
+    html += ".relay-btn{font-size:0.75em;padding:4px 8px;margin:2px;min-width:52px}";
+    html += ".pump-label{display:inline-block;width:100px}";
+    html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
+    html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
+    html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}";
+    html += ".mode-btn.auto{background:#0a0}";
+    html += "</style>";
     html += "</head><body><h1>🏊 Pool Controller</h1>";
 
+    // System status
     html += "<div class='card'><h2>System</h2>";
-    html += "<p>Uptime: " + String(millis() / 1000 / 60) + " min</p>";
-    html += "<p>WiFi: " + String(WiFi.isConnected() ? "✅ Connected" : "❌ Disconnected") + "</p>";
-    html += "<p>IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p>";
-    html += "<p>MQTT: " + String(mqttManager && mqttManager->isConnected() ? "✅ Connected" : "❌ Disconnected") + "</p>";
+    html += "<p>Mode: " + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</p>";
+    html += "<p>Uptime: " + String(millis() / 1000 / 60) + " min | ";
+    html += "WiFi: " + String(WiFi.isConnected() ? "✅" : "❌") + " | ";
+    html += "MQTT: " + String(mqttManager && mqttManager->isConnected() ? "✅" : "❌") + " | ";
+    html += "IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p>";
     html += "</div>";
 
+    // Sensor readings
     if (sensorManager) {
-        html += "<div class='card'><h2>Sensors</h2>";
-        html += "<p>pH: <span class='value'>" + String(sensorManager->getPH(), 2) + "</span> <span class='unit'>pH</span>";
-        html += sensorManager->isPHConnected() ? " ✅" : " <span class='bad'>⚠ sim</span></p>";
-        html += "<p>ORP: <span class='value'>" + String(sensorManager->getORP(), 0) + "</span> <span class='unit'>mV</span>";
-        html += sensorManager->isORPConnected() ? " ✅" : " <span class='bad'>⚠ sim</span></p>";
-        html += "<p>Water Temp: <span class='value'>" + String(sensorManager->getWaterTemperature(), 1) + "</span> <span class='unit'>°C</span></p>";
-        html += "<p>Air Temp: <span class='value'>" + String(sensorManager->getAirTemperature(), 1) + "</span> <span class='unit'>°C</span></p>";
-        html += "<p>Filter Pressure: <span class='value'>" + String(sensorManager->getFilterPressure(), 2) + "</span> <span class='unit'>bar</span></p>";
-        html += "</div>";
+        html += "<div class='card'><h2>Sensors</h2><p>";
+        html += "pH: <span class='value'>" + String(sensorManager->getPH(), 2) + "</span> pH";
+        html += sensorManager->isPHConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
+        html += "| ORP: <span class='value'>" + String(sensorManager->getORP(), 0) + "</span> mV";
+        html += sensorManager->isORPConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
+        html += "| Water: <span class='value'>" + String(sensorManager->getWaterTemperature(), 1) + "</span>°C";
+        html += "| Air: <span class='value'>" + String(sensorManager->getAirTemperature(), 1) + "</span>°C";
+        html += "| Pressure: <span class='value'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
+        html += "</p></div>";
     }
 
-    html += "<div class='card'><h2>Chemistry</h2>";
-    if (chemistryController) {
-        html += "<p>pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
-        html += "<p>Chlorine Control: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
+    // Manual mode toggle
+    html += "<div class='card'><h2>Control Mode</h2>";
+    html += "<p>";
+    if (manualMode) {
+        html += "<button class='mode-btn auto' onclick=\"fetch('/api/manual?mode=0').then(r=>r.json()).then(d=>location.reload())\">Return to AUTO Mode</button>";
+    } else {
+        html += "<button class='mode-btn' onclick=\"fetch('/api/manual?mode=1').then(r=>r.json()).then(d=>location.reload())\">Switch to MANUAL Mode</button>";
+    }
+    html += "</p><p style='font-size:0.8em;color:#888'>Manual mode disables automatic PID & filter pump control for testing.</p>";
+    html += "</div>";
+
+    // Pump controls
+    html += "<div class='card'><h2>Pump Control</h2><p>";
+    if (filterPumpCtrl) {
+        html += pumpButton("filter", "Filter", filterPumpCtrl->isOn()) + "<br>";
     }
     if (phPumpCtrl) {
-        html += "<p>pH Pump: " + String(phPumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
-        html += "<p>Chlorine Pump: " + String(chlorinePumpCtrl && chlorinePumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
+        html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn()) + "<br>";
     }
+    if (chlorinePumpCtrl) {
+        html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn()) + "<br>";
+    }
+    html += "</p></div>";
+
+    // Individual relay test
+    html += "<div class='card'><h2>Relay Test (Direct)</h2><p>";
+    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
+        html += relayButton(i, relayManager.getRelayState(i));
+    }
+    html += "</p><p style='font-size:0.7em;color:#888'>Direct relay control — bypasses pump logic. Use for hardware testing.</p>";
     html += "</div>";
 
-    html += "<div class='card'><h2>Filter Pump</h2>";
-    if (filterPumpLogic) {
-        html += "<p>Runtime today: " + String(phPumpCtrl ? phPumpCtrl->getRuntimeMinutes() : 0) + " min</p>";
+    // Chemistry status (read-only in manual)
+    html += "<div class='card'><h2>Chemistry Status</h2>";
+    if (chemistryController) {
+        html += "<p>pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
+        html += "<p>Chlorine Ctrl: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF") + "</p>";
     }
+    html += "<p>pH Pump: " + String(phPumpCtrl && phPumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
+    html += "<p>Chlorine Pump: " + String(chlorinePumpCtrl && chlorinePumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
+    html += "<p>Filter Pump: " + String(filterPumpCtrl && filterPumpCtrl->isOn() ? "🟢 ON" : "⚫ OFF") + "</p>";
     html += "</div>";
 
-    html += "<p style='color:#666'>Pool Controller v1.0.0 | ESP32 KC868-A8</p>";
+    // Actions
+    html += "<div class='card'><h2>Quick Actions</h2><p>";
+    html += "<a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a>";
+    html += "</p></div>";
+
+    html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p>";
     html += "</body></html>";
     webServer.send(200, "text/html", html);
 }
@@ -121,12 +189,116 @@ void handleAPI() {
     doc["wifi"] = WiFi.isConnected();
     doc["mqtt"] = mqttManager ? mqttManager->isConnected() : false;
     doc["free_heap"] = ESP.getFreeHeap();
+    doc["manual_mode"] = manualMode;
     doc["ph"] = sensorManager ? sensorManager->getPH() : 0;
     doc["orp"] = sensorManager ? sensorManager->getORP() : 0;
     doc["water_temp"] = sensorManager ? sensorManager->getWaterTemperature() : 0;
     doc["air_temp"] = sensorManager ? sensorManager->getAirTemperature() : 0;
     doc["filter_pressure"] = sensorManager ? sensorManager->getFilterPressure() : 0;
 
+    // Pump states
+    JsonObject pumps = doc.createNestedObject("pumps");
+    pumps["filter"] = filterPumpCtrl ? filterPumpCtrl->isOn() : false;
+    pumps["ph"] = phPumpCtrl ? phPumpCtrl->isOn() : false;
+    pumps["chlorine"] = chlorinePumpCtrl ? chlorinePumpCtrl->isOn() : false;
+
+    // Relay states
+    JsonArray relays = doc.createNestedArray("relays");
+    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
+        relays.add(relayManager.getRelayState(i));
+    }
+
+    String json;
+    serializeJson(doc, json);
+    webServer.send(200, "application/json", json);
+}
+
+void handleAPIRelaySet() {
+    if (!webServer.hasArg("channel") || !webServer.hasArg("state")) {
+        webServer.send(400, "application/json", "{\"error\":\"missing channel or state\"}");
+        return;
+    }
+    int channel = webServer.arg("channel").toInt();
+    bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
+
+    if (channel < 0 || channel >= KC868_A8_RELAY_COUNT) {
+        webServer.send(400, "application/json", "{\"error\":\"invalid channel\"}");
+        return;
+    }
+
+    relayManager.setRelay((uint8_t)channel, state);
+    log_i("Web: Relay %d -> %s", channel, state ? "ON" : "OFF");
+
+    StaticJsonDocument<128> doc;
+    doc["ok"] = true;
+    doc["channel"] = channel;
+    doc["state"] = state;
+    String json;
+    serializeJson(doc, json);
+    webServer.send(200, "application/json", json);
+}
+
+void handleAPIPumpSet() {
+    if (!webServer.hasArg("id") || !webServer.hasArg("state")) {
+        webServer.send(400, "application/json", "{\"error\":\"missing id or state\"}");
+        return;
+    }
+    String id = webServer.arg("id");
+    bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
+
+    PumpController* pump = nullptr;
+    if (id == "filter") pump = filterPumpCtrl;
+    else if (id == "ph") pump = phPumpCtrl;
+    else if (id == "chlorine") pump = chlorinePumpCtrl;
+
+    if (!pump) {
+        webServer.send(400, "application/json", "{\"error\":\"unknown pump id\"}");
+        return;
+    }
+
+    bool ok = state ? pump->turnOn() : pump->turnOff();
+    log_i("Web: Pump '%s' -> %s (%s)", id.c_str(), state ? "ON" : "OFF", ok ? "ok" : "blocked");
+
+    StaticJsonDocument<128> doc;
+    doc["ok"] = ok;
+    doc["pump"] = id;
+    doc["state"] = state;
+    doc["actual"] = pump->isOn();
+    String json;
+    serializeJson(doc, json);
+    webServer.send(200, "application/json", json);
+}
+
+void handleAPIManualMode() {
+    if (!webServer.hasArg("mode")) {
+        webServer.send(400, "application/json", "{\"error\":\"missing mode\"}");
+        return;
+    }
+    manualMode = (webServer.arg("mode") == "1" || webServer.arg("mode") == "true");
+
+    if (!manualMode) {
+        // Returning to auto — restore normal state
+        if (chemistryController) chemistryController->begin();
+        log_i("Web: Switched to AUTO mode");
+    } else {
+        log_i("Web: Switched to MANUAL mode");
+    }
+
+    StaticJsonDocument<64> doc;
+    doc["ok"] = true;
+    doc["manual_mode"] = manualMode;
+    String json;
+    serializeJson(doc, json);
+    webServer.send(200, "application/json", json);
+}
+
+void handleAPIAllOff() {
+    relayManager.allOff();
+    log_i("Web: Emergency all off!");
+
+    StaticJsonDocument<64> doc;
+    doc["ok"] = true;
+    doc["msg"] = "all relays off";
     String json;
     serializeJson(doc, json);
     webServer.send(200, "application/json", json);
@@ -135,6 +307,10 @@ void handleAPI() {
 void setupWebServer() {
     webServer.on("/", handleRoot);
     webServer.on("/api", handleAPI);
+    webServer.on("/api/relay/set", handleAPIRelaySet);
+    webServer.on("/api/pump/set", handleAPIPumpSet);
+    webServer.on("/api/manual", handleAPIManualMode);
+    webServer.on("/api/alloff", handleAPIAllOff);
     webServer.begin();
     log_i("Web server started on port 80");
 }
@@ -307,7 +483,7 @@ void setup() {
     chlorinePumpCtrl->setMinOffTime(cfg.chlorinePID.minOffTimeSec * 1000);
 
     FilterPumpConfig& fpCfg = cfg.filterPump;
-    PumpController* filterPumpCtrl = new PumpController(relayManager, fpCfg.relayChannel, "Filter Pump");
+    filterPumpCtrl = new PumpController(relayManager, fpCfg.relayChannel, "Filter Pump");
     filterPumpCtrl->begin();
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
     filterPumpLogic->begin();
@@ -351,11 +527,11 @@ void loop() {
         sensorManager->update();
     }
 
-    if (chemistryController && systemReady) {
+    if (chemistryController && systemReady && !manualMode) {
         chemistryController->update();
     }
 
-    if (filterPumpLogic && sensorManager) {
+    if (filterPumpLogic && sensorManager && !manualMode) {
         float waterTemp = sensorManager->getWaterTemperature();
         filterPumpLogic->update(waterTemp);
     }
