@@ -1,5 +1,6 @@
 #include "PumpController.h"
 #include <ArduinoJson.h>
+#include <time.h>
 
 PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel, const char* name)
     : _relayManager(relayManager)
@@ -171,17 +172,25 @@ void PumpController::resetDailyRuntime() const {
 }
 
 void PumpController::updateDailyReset() const {
-    unsigned long now = millis();
-    unsigned long msSinceMidnight = now % 86400000UL;
-    unsigned long msSinceReset = now - _lastDailyReset;
+    // Use NTP time for true midnight reset, fallback to millis uptime
+    time_t t = time(nullptr);
+    if (t > 100000) {
+        // NTP synced: check if date changed
+        struct tm* ti = localtime(&t);
+        int todaySecs = ti->tm_hour * 3600 + ti->tm_min * 60 + ti->tm_sec;
+        time_t todayMidnight = t - todaySecs;
 
-    if (msSinceReset > 86400000UL) {
-        resetDailyRuntime();
+        // Reset if last daily reset was before today's midnight (in ms)
+        if ((unsigned long long)_lastDailyReset < (unsigned long long)todayMidnight * 1000ULL) {
+            resetDailyRuntime();
+        }
+    } else {
+        // No NTP: reset every 24h of uptime
+        unsigned long now = millis();
+        if (now - _lastDailyReset > 86400000UL) {
+            resetDailyRuntime();
+        }
     }
-
-    static unsigned long lastCheck = now;
-    if (lastCheck > now) lastCheck = now;
-    lastCheck = now;
 }
 
 String PumpController::getStateJSON() const {
