@@ -55,6 +55,10 @@ void PoolChemistryController::update() {
     } else {
         _chlorinePump.forceOff();
     }
+
+    // Update simulation with current pump states for pump-aware drift
+    _sensors.setPHPumpActive(_phPump.isOn());
+    _sensors.setChlorinePumpActive(_chlorinePump.isOn());
 }
 
 void PoolChemistryController::updatePHPID(float dtSec) {
