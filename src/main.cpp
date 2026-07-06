@@ -257,12 +257,70 @@ void setup() {
 
 void loop() {
     unsigned long loopStart = millis();
-    feedWatchdog(); maintainWiFi();
+    feedWatchdog();
+    maintainWiFi();
+
     if (mqttManager) mqttManager->loop();
     webServer.handleClient();
+
     if (sensorManager) sensorManager->update();
+
     if (chemistryController && systemReady && !manualMode) chemistryController->update();
-    if (filterPumpLogic && sensorManager && !manualMode) filterPumpLogic->update(sensorManager->getWaterTemperature());
+
+    if (filterPumpLogic && sensorManager && !manualMode) {
+        filterPumpLogic->update(sensorManager->getWaterTemperature());
+    }
+
+    // ─── MQTT state publishing (every 30s) ───────────────────────────
+    if (mqttManager && systemReady) {
+        unsigned long now = millis();
+        if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
+            lastSensorPublish = now;
+
+            String sensorStates = sensorManager ? sensorManager->getAllStateJSON() : "{}";
+            String chemistryState = chemistryController ? chemistryController->getStateJSON() : "{}";
+            String filterState = filterPumpLogic ? filterPumpLogic->getStateJSON() : "{}";
+
+            StaticJsonDocument<512> pumpDoc;
+            if (phPumpCtrl) {
+                JsonObject ph = pumpDoc.createNestedObject("ph_pump");
+                ph["name"] = phPumpCtrl->getName();
+                ph["on"] = phPumpCtrl->isOn();
+                ph["runtime_today_min"] = phPumpCtrl->getRuntimeMinutes();
+                ph["last_on_duration_ms"] = phPumpCtrl->getLastOnDuration();
+            }
+            if (chlorinePumpCtrl) {
+                JsonObject cl = pumpDoc.createNestedObject("chlorine_pump");
+                cl["name"] = chlorinePumpCtrl->getName();
+                cl["on"] = chlorinePumpCtrl->isOn();
+                cl["runtime_today_min"] = chlorinePumpCtrl->getRuntimeMinutes();
+                cl["last_on_duration_ms"] = chlorinePumpCtrl->getLastOnDuration();
+            }
+            String pumpStates;
+            serializeJson(pumpDoc, pumpStates);
+
+            mqttManager->publishState(sensorStates, chemistryState, filterState, pumpStates);
+
+            StaticJsonDocument<256> relayDoc;
+            for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
+                String key = "relay_" + String(i);
+                relayDoc[key.c_str()] = relayManager.getRelayState(i);
+            }
+            String relayJson;
+            serializeJson(relayDoc, relayJson);
+            mqttManager->publish("relays", relayJson, false);
+        }
+    }
+
     AppConfig& cfg = configManager.get();
-    int delayMs = cfg.loopDelayMs - (int)(millis() - loopStart); if (delayMs > 0) delay(delayMs);
+    unsigned long elapsed = millis() - loopStart;
+    int delayMs = cfg.loopDelayMs - (int)elapsed;
+    if (delayMs > 0) delay(delayMs);
+    else if (delayMs < -100) {
+        static unsigned long lastWarn = 0;
+        if (millis() - lastWarn > 60000) {
+            log_w("Loop took %lu ms (max %d)", elapsed, cfg.loopDelayMs);
+            lastWarn = millis();
+        }
+    }
 }
