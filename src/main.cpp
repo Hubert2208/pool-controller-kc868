@@ -120,20 +120,67 @@ void handleRoot() {
     if (chemistryController) { html += "pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF"); html += " | Chlorine Control: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF"); }
     html += "</p></div>";
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
+    // ─── JavaScript ─────────────────────────────────────────────────
     html += "<script>";
-    html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "setInterval(function(){fetch('/api').then(r=>r.json()).then(d=>{";
-    html += "var el;(el=document.getElementById('val-ph'))?el.textContent=d.ph.toFixed(2):0;";
-    html += "(el=document.getElementById('val-orp'))?el.textContent=d.orp.toFixed(0):0;";
-    html += "(el=document.getElementById('val-water'))?el.textContent=d.water_temp.toFixed(1):0;(el=document.getElementById('val-air'))?el.textContent=d.air_temp.toFixed(1):0;";
-    html += "(el=document.getElementById('val-pressure'))?el.textContent=d.filter_pressure.toFixed(2):0;(el=document.getElementById('sys-uptime'))?el.textContent=Math.floor(d.uptime_ms/60000):0;";
-    html += "(el=document.getElementById('sys-wifi'))?el.textContent=d.wifi?'✅':'❌':0;(el=document.getElementById('sys-mqtt'))?el.textContent=d.mqtt?'✅':'❌':0;";
-    html += "(el=document.getElementById('sys-mode'))?el.innerHTML=d.manual_mode?'<span class=\"manual-badge\">🔧 MANUAL</span>':'<span class=\"auto-badge\">🤖 AUTO</span>':0;";
-    html += "if(d.ph_setpoint!==undefined){var r=document.getElementById('sp-ph-range'),v=document.getElementById('sp-ph-val');if(r&&parseFloat(r.value)!==d.ph_setpoint){r.value=d.ph_setpoint;if(v)v.textContent=d.ph_setpoint.toFixed(1)}}";
-    html += "if(d.orp_setpoint!==undefined){var r=document.getElementById('sp-orp-range'),v=document.getElementById('sp-orp-val');if(r&&parseInt(r.value)!==d.orp_setpoint){r.value=d.orp_setpoint;if(v)v.textContent=d.orp_setpoint}}";
-    html += "['filter','ph','chlorine'].forEach(function(id){var b=document.getElementById('btn-'+id),r=document.getElementById('run-'+id);if(b&&d.pumps&&d.pumps[id]){var p=d.pumps[id];b.textContent=p.on?'ON':'OFF';b.className='pump-btn '+(p.on?'btn-on':'btn-off');if(r)r.textContent='('+(p.current_min?p.current_min:0)+'m / '+p.today_min+'m today)'}})";
-    html += "if(d.relays)for(var i=0;i<d.relays.length;i++){var r=document.getElementById('rel-'+i);if(r){var on=d.relays[i];r.textContent='R'+i+': '+(on?'ON':'OFF');r.className='relay-btn '+(on?'btn-on':'btn-off')}}";
-    html += "}).catch(function(){})},5000)";
+    html += "function applySetpoints(e){";
+    html += "var ph=document.getElementById('sp-ph-range').value;";
+    html += "var orp=document.getElementById('sp-orp-range').value;";
+    html += "var btn=e.target;";
+    html += "btn.textContent='Saving...';btn.disabled=true;";
+    html += "fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp))";
+    html += ".then(function(r){return r.json()})";
+    html += ".then(function(d){";
+    html += "btn.textContent='Apply Setpoints';btn.disabled=false;";
+    html += "var s=document.getElementById('sp-saved');";
+    html += "s.style.display='inline';";
+    html += "setTimeout(function(){s.style.display='none'},2500);";
+    html += "}).catch(function(){";
+    html += "btn.textContent='Apply Setpoints';btn.disabled=false;";
+    html += "});";
+    html += "}";
+    html += "function refreshDashboard(){";
+    html += "fetch('/api').then(function(r){return r.json()}).then(function(d){";
+    html += "var el;";
+    html += "el=document.getElementById('val-ph');if(el)el.textContent=d.ph.toFixed(2);";
+    html += "el=document.getElementById('val-orp');if(el)el.textContent=d.orp.toFixed(0);";
+    html += "el=document.getElementById('val-water');if(el)el.textContent=d.water_temp.toFixed(1);";
+    html += "el=document.getElementById('val-air');if(el)el.textContent=d.air_temp.toFixed(1);";
+    html += "el=document.getElementById('val-pressure');if(el)el.textContent=d.filter_pressure.toFixed(2);";
+    html += "el=document.getElementById('sys-uptime');if(el)el.textContent=Math.floor(d.uptime_ms/60000);";
+    html += "el=document.getElementById('sys-wifi');if(el)el.textContent=d.wifi?'✅':'❌';";
+    html += "el=document.getElementById('sys-mqtt');if(el)el.textContent=d.mqtt?'✅':'❌';";
+    html += "el=document.getElementById('sys-mode');";
+    html += "if(el){el.innerHTML=d.manual_mode?'<span class=\\\"manual-badge\\\">🔧 MANUAL</span>':'<span class=\\\"auto-badge\\\">🤖 AUTO</span>';}";
+    html += "if(d.ph_setpoint!==undefined){";
+    html += "var r=document.getElementById('sp-ph-range');";
+    html += "if(r&&parseFloat(r.value)!==d.ph_setpoint){r.value=d.ph_setpoint;";
+    html += "var v=document.getElementById('sp-ph-val');if(v)v.textContent=d.ph_setpoint.toFixed(1);}";
+    html += "}";
+    html += "if(d.orp_setpoint!==undefined){";
+    html += "var r=document.getElementById('sp-orp-range');";
+    html += "if(r&&parseInt(r.value)!==d.orp_setpoint){r.value=d.orp_setpoint;";
+    html += "var v=document.getElementById('sp-orp-val');if(v)v.textContent=d.orp_setpoint;}";
+    html += "}";
+    html += "['filter','ph','chlorine'].forEach(function(id){";
+    html += "var b=document.getElementById('btn-'+id);";
+    html += "var r=document.getElementById('run-'+id);";
+    html += "if(b&&d.pumps&&d.pumps[id]){";
+    html += "var p=d.pumps[id];";
+    html += "b.textContent=p.on?'ON':'OFF';";
+    html += "b.className='pump-btn '+(p.on?'btn-on':'btn-off');";
+    html += "if(r)r.textContent='('+(p.current_min?p.current_min:0)+'m / '+p.today_min+'m today)';";
+    html += "}";
+    html += "});";
+    html += "if(d.relays){";
+    html += "for(var i=0;i<d.relays.length;i++){";
+    html += "var r=document.getElementById('rel-'+i);";
+    html += "if(r){var on=d.relays[i];r.textContent='R'+i+': '+(on?'ON':'OFF');r.className='relay-btn '+(on?'btn-on':'btn-off');}";
+    html += "}";
+    html += "}";
+    html += "}).catch(function(e){console.log('dashboard refresh error',e)});";
+    html += "}";
+    html += "refreshDashboard();";
+    html += "setInterval(refreshDashboard,5000);";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -300,6 +347,12 @@ void loop() {
             serializeJson(pumpDoc, pumpStates);
 
             mqttManager->publishState(sensorStates, chemistryState, filterState, pumpStates);
+
+            // ─── Raw pH/ORP values on dedicated topics ───────────────
+            if (sensorManager) {
+                mqttManager->publish("ph_raw", String(sensorManager->getPH(), 2), false);
+                mqttManager->publish("orp_raw", String(sensorManager->getORP(), 0), false);
+            }
 
             StaticJsonDocument<256> relayDoc;
             for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) {
