@@ -48,39 +48,26 @@ bool MQTTManager::connect() {
     StaticJsonDocument<64> lwtDoc;
     lwtDoc["state"] = "offline";
     lwtDoc["client"] = cfg.mqtt.clientId.c_str();
-    String lwtPayload;
-    serializeJson(lwtDoc, lwtPayload);
+    String lwtPayload; serializeJson(lwtDoc, lwtPayload);
     bool connected = false;
-    if (cfg.mqtt.username.length() > 0) {
+    if (cfg.mqtt.username.length() > 0)
         connected = _client.connect(cfg.mqtt.clientId.c_str(), cfg.mqtt.username.c_str(), cfg.mqtt.password.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
-    } else {
+    else
         connected = _client.connect(cfg.mqtt.clientId.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
-    }
-    if (connected) {
-        log_i("MQTT connected to %s:%d", cfg.mqtt.broker.c_str(), cfg.mqtt.port);
-        publishOnline();
-        subscribeCommands();
-        publishDiscovery();
-        return true;
-    }
+    if (connected) { log_i("MQTT connected"); publishOnline(); subscribeCommands(); publishDiscovery(); return true; }
     log_e("MQTT connect failed, rc=%d", _client.state());
     return false;
 }
 
 void MQTTManager::subscribeCommands() {
-    AppConfig& cfg = _config.get();
-    String cmdTopic = _baseTopic + "/command/#";
-    if (_client.subscribe(cmdTopic.c_str(), 1)) log_i("MQTT subscribed: %s", cmdTopic.c_str());
-    String cfgTopic = _baseTopic + "/config/set";
-    if (_client.subscribe(cfgTopic.c_str(), 1)) log_i("MQTT subscribed: %s", cfgTopic.c_str());
+    String cmd = _baseTopic + "/command/#"; _client.subscribe(cmd.c_str(), 1);
+    String cfg = _baseTopic + "/config/set"; _client.subscribe(cfg.c_str(), 1);
 }
 
 bool MQTTManager::publish(const char* topicSuffix, const String& payload, bool retained) {
     if (!_client.connected()) return false;
     String fullTopic = _baseTopic + "/" + String(topicSuffix);
-    bool ok = _client.publish(fullTopic.c_str(), payload.c_str(), retained);
-    if (!ok) log_w("MQTT publish failed: %s", fullTopic.c_str());
-    return ok;
+    return _client.publish(fullTopic.c_str(), payload.c_str(), retained);
 }
 
 void MQTTManager::publishState(const String& sensorStates, const String& chemistryState,
@@ -94,19 +81,14 @@ void MQTTManager::publishState(const String& sensorStates, const String& chemist
 
 void MQTTManager::publishOnline() {
     StaticJsonDocument<64> doc;
-    doc["state"] = "online";
-    doc["client"] = _config.get().mqtt.clientId.c_str();
-    doc["version"] = "1.0.0";
-    String payload;
-    serializeJson(doc, payload);
+    doc["state"] = "online"; doc["client"] = _config.get().mqtt.clientId.c_str(); doc["version"] = "1.0.0";
+    String payload; serializeJson(doc, payload);
     publish("status/LWT", payload, true);
 }
 
 void MQTTManager::publishOffline() {
-    StaticJsonDocument<64> doc;
-    doc["state"] = "offline";
-    String payload;
-    serializeJson(doc, payload);
+    StaticJsonDocument<64> doc; doc["state"] = "offline";
+    String payload; serializeJson(doc, payload);
     publish("status/LWT", payload, true);
 }
 
@@ -119,40 +101,21 @@ void MQTTManager::publishDiscovery() {
     deviceDoc["model"] = "KC868-A8";
     deviceDoc["manufacturer"] = "Kincony";
     deviceDoc["sw_version"] = "1.0.0";
-    String deviceStr;
-    serializeJson(deviceDoc, deviceStr);
-
+    String deviceStr; serializeJson(deviceDoc, deviceStr);
     auto disco = [&](const char* type, const char* objId, const String& cfgJson) {
         String topic = "homeassistant/" + String(type) + "/" + cfg.mqtt.clientId + "/" + objId + "/config";
         _client.publish(topic.c_str(), cfgJson.c_str(), true);
     };
-
-    disco("sensor", "ph", "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\","
-          "\"state_topic\":\"" + _baseTopic + "/ph_raw\","
-          "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_ph\"}");
-
-    disco("sensor", "orp", "{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\","
-          "\"state_topic\":\"" + _baseTopic + "/orp_raw\","
-          "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_orp\"}");
-
-    disco("sensor", "water_temp", "{\"device_class\":\"temperature\",\"name\":\"Pool Water Temperature\",\"unit_of_measurement\":\"\\u00b0C\","
-          "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.water_temperature.value }}\","
-          "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_wt\"}");
-
-    disco("sensor", "air_temp", "{\"device_class\":\"temperature\",\"name\":\"Air Temperature\",\"unit_of_measurement\":\"\\u00b0C\","
-          "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.air_temperature.value }}\","
-          "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_at\"}");
-
+    disco("sensor","ph","{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\",\"state_topic\":\""+_baseTopic+"/ph_raw\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_ph\"}");
+    disco("sensor","orp","{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\",\"state_topic\":\""+_baseTopic+"/orp_raw\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_orp\"}");
+    disco("sensor","water_temp","{\"device_class\":\"temperature\",\"name\":\"Water Temp\",\"unit_of_measurement\":\"°C\",\"state_topic\":\""+_baseTopic+"/sensors\",\"value_template\":\"{{ value_json.water_temperature.value }}\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_wt\"}");
+    disco("sensor","air_temp","{\"device_class\":\"temperature\",\"name\":\"Air Temp\",\"unit_of_measurement\":\"°C\",\"state_topic\":\""+_baseTopic+"/sensors\",\"value_template\":\"{{ value_json.air_temperature.value }}\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_at\"}");
     _discoveryPublished = true;
     log_i("HA discovery published");
 }
 
 void MQTTManager::mqttCallback(char* topic, byte* payload, unsigned int length) {
-    if (_instance) {
-        String payloadStr = "";
-        for (unsigned int i = 0; i < length; i++) payloadStr += (char)payload[i];
-        _instance->handleMQTTMessage(topic, payloadStr);
-    }
+    if (_instance) { String s; for (unsigned int i=0;i<length;i++) s+=(char)payload[i]; _instance->handleMQTTMessage(topic, s); }
 }
 
 void MQTTManager::handleMQTTMessage(char* topic, const String& payload) {
