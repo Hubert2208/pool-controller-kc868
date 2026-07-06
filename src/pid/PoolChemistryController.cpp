@@ -24,16 +24,20 @@ void PoolChemistryController::begin() {
     _phPID.setTunings(cfg.phPID.kp, cfg.phPID.ki, cfg.phPID.kd);
     _phPID.setSetpoint(cfg.phPID.setpoint);
     _phPID.setOutputLimits(cfg.phPID.outputMin, cfg.phPID.outputMax);
+    _phPID.setReverseAction(cfg.phPID.reverseAction);
 
     _chlorinePID.setTunings(cfg.chlorinePID.kp, cfg.chlorinePID.ki, cfg.chlorinePID.kd);
     _chlorinePID.setSetpoint(cfg.chlorinePID.setpoint);
     _chlorinePID.setOutputLimits(cfg.chlorinePID.outputMin, cfg.chlorinePID.outputMax);
+    _chlorinePID.setReverseAction(cfg.chlorinePID.reverseAction);
 
     log_i("Pool chemistry controller initialized");
-    log_i("  pH PID: Kp=%.2f Ki=%.4f Kd=%.4f setpoint=%.1f",
-          cfg.phPID.kp, cfg.phPID.ki, cfg.phPID.kd, cfg.phPID.setpoint);
-    log_i("  Cl PID: Kp=%.2f Ki=%.4f Kd=%.4f setpoint=%.0f mV",
-          cfg.chlorinePID.kp, cfg.chlorinePID.ki, cfg.chlorinePID.kd, cfg.chlorinePID.setpoint);
+    log_i("  pH PID: Kp=%.2f Ki=%.4f Kd=%.4f setpoint=%.1f reverse=%s",
+          cfg.phPID.kp, cfg.phPID.ki, cfg.phPID.kd, cfg.phPID.setpoint,
+          cfg.phPID.reverseAction ? "true" : "false");
+    log_i("  Cl PID: Kp=%.2f Ki=%.4f Kd=%.4f setpoint=%.0f mV reverse=%s",
+          cfg.chlorinePID.kp, cfg.chlorinePID.ki, cfg.chlorinePID.kd, cfg.chlorinePID.setpoint,
+          cfg.chlorinePID.reverseAction ? "true" : "false");
 }
 
 void PoolChemistryController::update() {
@@ -55,6 +59,10 @@ void PoolChemistryController::update() {
     } else {
         _chlorinePump.forceOff();
     }
+
+    // Update simulation with current pump states for pump-aware drift
+    _sensors.setPHPumpActive(_phPump.isOn());
+    _sensors.setChlorinePumpActive(_chlorinePump.isOn());
 }
 
 void PoolChemistryController::updatePHPID(float dtSec) {

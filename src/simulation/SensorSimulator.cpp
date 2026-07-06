@@ -54,7 +54,7 @@ void SensorSimulator::update() {
     }
 
     unsigned long deltaMs = now - _lastUpdate;
-    if (deltaMs < 100) return;  // don't update too often
+    if (deltaMs < 100) return;  // don\'t update too often
     _lastUpdate = now;
 
     // Calculate drift for this time step
@@ -74,6 +74,13 @@ void SensorSimulator::update() {
     float noise = randomWalkStep() * maxStep * 0.3f;
 
     _currentValue += pull + noise;
+
+    // Apply pump-aware directional drift (pump chemistry effect)
+    if (_pumpActive) {
+        _currentValue += _pumpDriftPerHour * deltaHours;
+    } else {
+        _currentValue += _naturalDriftPerHour * deltaHours;
+    }
 
     // Clamp to range
     _currentValue = max(_minVal, min(_maxVal, _currentValue));

@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 3  // bump to force config regeneration on breaking changes
+#define CONFIG_VERSION 4  // added reverseAction to PIDParams
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -22,6 +22,7 @@ struct PIDParams {
     float outputMax = 100.0;
     int minOnTimeSec = 10;
     int minOffTimeSec = 60;
+    bool reverseAction = false;  // true = reverse acting (output↑ when PV↑), e.g. pH
 
     String toJson() const;
     static PIDParams fromJson(JsonVariantConst json);

@@ -17,6 +17,11 @@ public:
     // Set output clamping range
     void setOutputLimits(float min, float max);
 
+    // Set control direction: false = direct (output↑ when input↓),
+    //                        true  = reverse (output↑ when input↑)
+    void setReverseAction(bool reverse) { _reverseAction = reverse; }
+    bool getReverseAction() const { return _reverseAction; }
+
     // Compute output for given input and time step (seconds)
     // Returns the controller output
     float compute(float input, float dtSec);
@@ -45,6 +50,7 @@ private:
     float _integral;
     float _lastInput;
     float _pTerm, _iTerm, _dTerm;
+    bool _reverseAction;
     bool _enabled;
     bool _firstRun;
 };
