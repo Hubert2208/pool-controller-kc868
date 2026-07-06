@@ -12,6 +12,7 @@ PIDController::PIDController()
     , _pTerm(0.0f)
     , _iTerm(0.0f)
     , _dTerm(0.0f)
+    , _reverseAction(false)
     , _enabled(true)
     , _firstRun(true)
 {
@@ -29,6 +30,7 @@ PIDController::PIDController(float kp, float ki, float kd)
     , _pTerm(0.0f)
     , _iTerm(0.0f)
     , _dTerm(0.0f)
+    , _reverseAction(false)
     , _enabled(true)
     , _firstRun(true)
 {
@@ -70,7 +72,13 @@ float PIDController::compute(float input, float dtSec) {
     // Limit dt to prevent derivative kick on long pauses
     if (dtSec > 5.0f) dtSec = 5.0f;
 
-    float error = _setpoint - input;
+    // Reverse action: when process value decreases with control output
+    // (e.g. pH-Minus makes pH go DOWN), use input - setpoint so that
+    // output is positive when input > setpoint (pH too high).
+    // Direct action: when process value increases with control output
+    // (e.g. chlorine makes ORP go UP), use setpoint - input so that
+    // output is positive when input < setpoint (ORP too low).
+    float error = _reverseAction ? (input - _setpoint) : (_setpoint - input);
 
     // Calculate proportional term
     _pTerm = _kp * error;
@@ -89,8 +97,10 @@ float PIDController::compute(float input, float dtSec) {
     _iTerm = _integral;
 
     // Calculate derivative term (on measurement, not error, to avoid derivative kick)
+    // Derivative on measurement: when reverseAction is true, we flip the
+    // sign because dInput sign matches the error definition
     float dInput = (_lastInput - input) / dtSec;
-    _dTerm = _kd * dInput;
+    _dTerm = _reverseAction ? (_kd * -dInput) : (_kd * dInput);
 
     // Sum terms
     float output = _pTerm + _iTerm + _dTerm;

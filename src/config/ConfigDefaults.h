@@ -57,19 +57,25 @@ inline void apply(AppConfig& _config) {
     _config.pressureSensor.simMax          = 2.5f;
     _config.pressureSensor.simDriftPerHour = 0.1f;
 
+    // pH PID: REVERSE acting — adding pH-Minus DECREASES pH
+    // When pH > setpoint → output should be positive → pump ON
     _config.phPID.kp            = 1.2f;
     _config.phPID.ki            = 0.08f;
     _config.phPID.kd            = 0.04f;
     _config.phPID.setpoint      = 7.2f;
     _config.phPID.minOnTimeSec  = 15;
     _config.phPID.minOffTimeSec = 60;
+    _config.phPID.reverseAction = true;
 
+    // Chlorine PID: DIRECT acting — adding chlorine INCREASES ORP
+    // When ORP < setpoint → output should be positive → pump ON
     _config.chlorinePID.kp            = 0.8f;
     _config.chlorinePID.ki            = 0.05f;
     _config.chlorinePID.kd            = 0.02f;
     _config.chlorinePID.setpoint      = 650.0f;
     _config.chlorinePID.minOnTimeSec  = 30;
     _config.chlorinePID.minOffTimeSec = 120;
+    // reverseAction defaults to false (direct acting) for chlorine
 }
 
 } // namespace SetDefaults
