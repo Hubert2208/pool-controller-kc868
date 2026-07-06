@@ -38,6 +38,7 @@ static unsigned long startTime = 0;
 static int watchdogCount = 0;
 static const char* WIFI_HOSTNAME = "pool-controller";
 static const char* AP_SSID = "PoolController-AP";
+static const char* AP_PASSWORD = "***";
 static const IPAddress AP_IP(192, 168, 4, 1);
 static const IPAddress AP_GATEWAY(192, 168, 4, 1);
 static const IPAddress AP_SUBNET(255, 255, 255, 0);
@@ -167,7 +168,16 @@ void handleAPIRelaySet() {
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 
-void handleAPIPumpSet() { webServer.send(200, "application/json", "{\"ok\":false,\"msg\":\"not implemented\"}"); }
+void handleAPIPumpSet() {
+    if (!webServer.hasArg("id") || !webServer.hasArg("state")) { webServer.send(400, "application/json", "{\"error\":\"missing args\"}"); return; }
+    String id = webServer.arg("id"); bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
+    PumpController* pump = nullptr;
+    if (id == "filter") pump = filterPumpCtrl; else if (id == "ph") pump = phPumpCtrl; else if (id == "chlorine") pump = chlorinePumpCtrl;
+    if (!pump) { webServer.send(400, "application/json", "{\"error\":\"bad id\"}"); return; }
+    bool ok = state ? pump->turnOn() : pump->turnOff();
+    String json = "{\"ok\":" + String(ok) + ",\"pump\":\"" + id + "\"}";
+    webServer.send(200, "application/json", json);
+}
 
 void handleAPIManualMode() {
     if (!webServer.hasArg("mode")) { webServer.send(400, "application/json", "{\"error\":\"missing mode\"}"); return; }
@@ -246,6 +256,7 @@ void setup() {
 }
 
 void loop() {
+    unsigned long loopStart = millis();
     feedWatchdog(); maintainWiFi();
     if (mqttManager) mqttManager->loop();
     webServer.handleClient();
