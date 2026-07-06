@@ -106,10 +106,10 @@ void MQTTManager::publishDiscovery() {
         String topic = "homeassistant/" + String(type) + "/" + cfg.mqtt.clientId + "/" + objId + "/config";
         _client.publish(topic.c_str(), cfgJson.c_str(), true);
     };
-    disco("sensor","ph","{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\",\"state_topic\":\""+_baseTopic+"/ph_raw\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_ph\"}");
-    disco("sensor","orp","{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\",\"state_topic\":\""+_baseTopic+"/orp_raw\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_orp\"}");
-    disco("sensor","water_temp","{\"device_class\":\"temperature\",\"name\":\"Water Temp\",\"unit_of_measurement\":\"°C\",\"state_topic\":\""+_baseTopic+"/sensors\",\"value_template\":\"{{ value_json.water_temperature.value }}\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_wt\"}");
-    disco("sensor","air_temp","{\"device_class\":\"temperature\",\"name\":\"Air Temp\",\"unit_of_measurement\":\"°C\",\"state_topic\":\""+_baseTopic+"/sensors\",\"value_template\":\"{{ value_json.air_temperature.value }}\",\"device\":"+deviceStr+",\"unique_id\":\""+cfg.mqtt.clientId+"_at\"}");
+    disco("sensor","ph","{\"dev_cla\":\"ph\",\"name\":\"Pool pH\",\"unit_of_meas\":\"pH\",\"stat_t\":\""+_baseTopic+"/ph_raw\",\"dev\":"+deviceStr+",\"uniq_id\":\""+cfg.mqtt.clientId+"_ph\"}");
+    disco("sensor","orp","{\"dev_cla\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_meas\":\"mV\",\"stat_t\":\""+_baseTopic+"/orp_raw\",\"dev\":"+deviceStr+",\"uniq_id\":\""+cfg.mqtt.clientId+"_orp\"}");
+    disco("sensor","water_temp","{\"dev_cla\":\"temperature\",\"name\":\"Water Temp\",\"unit_of_meas\":\"°C\",\"stat_t\":\""+_baseTopic+"/sensors\",\"val_tpl\":\"{{ value_json.water_temperature.value }}\",\"dev\":"+deviceStr+",\"uniq_id\":\""+cfg.mqtt.clientId+"_wt\"}");
+    disco("sensor","air_temp","{\"dev_cla\":\"temperature\",\"name\":\"Air Temp\",\"unit_of_meas\":\"°C\",\"stat_t\":\""+_baseTopic+"/sensors\",\"val_tpl\":\"{{ value_json.air_temperature.value }}\",\"dev\":"+deviceStr+",\"uniq_id\":\""+cfg.mqtt.clientId+"_at\"}");
     _discoveryPublished = true;
     log_i("HA discovery published");
 }
