@@ -13,6 +13,7 @@ String PIDParams::toJson() const {
     doc["outputMax"] = outputMax;
     doc["minOnTimeSec"] = minOnTimeSec;
     doc["minOffTimeSec"] = minOffTimeSec;
+    doc["reverseAction"] = reverseAction;
     String out;
     serializeJson(doc, out);
     return out;
@@ -29,6 +30,7 @@ PIDParams PIDParams::fromJson(JsonVariantConst json) {
         p.outputMax = json["outputMax"] | p.outputMax;
         p.minOnTimeSec = json["minOnTimeSec"] | p.minOnTimeSec;
         p.minOffTimeSec = json["minOffTimeSec"] | p.minOffTimeSec;
+        p.reverseAction = json["reverseAction"] | p.reverseAction;
     }
     return p;
 }
@@ -215,6 +217,7 @@ String AppConfig::toJson() const {
     phPidObj["outputMax"] = phPID.outputMax;
     phPidObj["minOnTimeSec"] = phPID.minOnTimeSec;
     phPidObj["minOffTimeSec"] = phPID.minOffTimeSec;
+    phPidObj["reverseAction"] = phPID.reverseAction;
 
     JsonObject clPidObj = doc.createNestedObject("chlorinePID");
     clPidObj["kp"] = chlorinePID.kp;
@@ -225,6 +228,7 @@ String AppConfig::toJson() const {
     clPidObj["outputMax"] = chlorinePID.outputMax;
     clPidObj["minOnTimeSec"] = chlorinePID.minOnTimeSec;
     clPidObj["minOffTimeSec"] = chlorinePID.minOffTimeSec;
+    clPidObj["reverseAction"] = chlorinePID.reverseAction;
 
     JsonObject phSens = doc.createNestedObject("phSensor");
     phSens["enabled"] = phSensor.enabled;
@@ -464,6 +468,7 @@ bool ConfigManager::updateFromJson(const String& json) {
         if (src["outputMax"].is<float>()) dst.outputMax = src["outputMax"];
         if (src["minOnTimeSec"].is<int>()) dst.minOnTimeSec = src["minOnTimeSec"];
         if (src["minOffTimeSec"].is<int>()) dst.minOffTimeSec = src["minOffTimeSec"];
+        if (src["reverseAction"].is<bool>()) dst.reverseAction = src["reverseAction"];
     };
 
     auto mergeSensor = [](JsonObject& src, SensorConfig& dst) {
