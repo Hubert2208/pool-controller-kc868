@@ -107,6 +107,14 @@ void handleRoot() {
     html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}";
     html += ".mode-btn.auto{background:#0a0}";
+    html += ".sp-label{display:inline-block;width:80px;text-align:right;margin-right:8px}";
+    html += ".sp-input{width:70px;border:1px solid #0af;background:#1a1a2e;color:#0f0;padding:4px 8px;border-radius:4px;text-align:center}";
+    html += ".sp-range{width:140px;margin:0 8px;vertical-align:middle}";
+    html += ".sp-val{display:inline-block;width:45px;color:#0f0;font-weight:bold}";
+    html += ".sp-apply{background:#0af;color:#000;border:none;padding:6px 20px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:8px}";
+    html += ".sp-apply:hover{background:#0cf}";
+    html += ".sp-row{margin:4px 0}";
+    html += ".sp-saved{color:#0f0;font-size:0.8em;margin-left:10px;display:none}";
     html += "</style>";
     html += "</head><body><h1>🏊 Pool Controller</h1>";
 
@@ -132,6 +140,21 @@ void handleRoot() {
         html += "| Pressure: <span class='value' id='val-pressure'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
     }
     html += "</p></div>";
+
+    // Setpoints card — NEW
+    float phSP = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
+    float orpSP = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
+    html += "<div class='card'><h2>🎯 Chemistry Setpoints</h2>";
+    html += "<div class='sp-row'><span class='sp-label'>pH Target:</span>";
+    html += "<input type='range' class='sp-range' id='sp-ph-range' min='6.0' max='8.0' step='0.1' value='" + String(phSP, 1) + "' oninput=\"document.getElementById('sp-ph-val').textContent=this.value\">";
+    html += "<span class='sp-val' id='sp-ph-val'>" + String(phSP, 1) + "</span> pH</div>";
+    html += "<div class='sp-row'><span class='sp-label'>ORP Target:</span>";
+    html += "<input type='range' class='sp-range' id='sp-orp-range' min='200' max='900' step='10' value='" + String((int)orpSP) + "' oninput=\"document.getElementById('sp-orp-val').textContent=this.value\">";
+    html += "<span class='sp-val' id='sp-orp-val'>" + String((int)orpSP) + "</span> mV</div>";
+    html += "<button class='sp-apply' id='sp-apply-btn' onclick=\"applySetpoints()\">Apply Setpoints</button>";
+    html += "<span class='sp-saved' id='sp-saved'>✅ Saved!</span>";
+    html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Changes take effect immediately in the PID controller.</p>";
+    html += "</div>";
 
     // Manual mode toggle
     html += "<div class='card'><h2>Control Mode</h2>";
@@ -176,6 +199,7 @@ void handleRoot() {
     html += "<p id='chem-row'>";
     if (chemistryController) {
         html += "pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF");
+        html += " | Chlorine Control: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF");
     }
     html += "</p></div>";
 
@@ -187,6 +211,18 @@ void handleRoot() {
     // Auto-refresh script: poll /api every 5 seconds
     html += "<script>";
     html += "function fmtMin(m){return m+'m';}";
+    html += "function applySetpoints(){";
+    html += "var ph=document.getElementById('sp-ph-range').value;";
+    html += "var orp=document.getElementById('sp-orp-range').value;";
+    html += "var btn=document.getElementById('sp-apply-btn');";
+    html += "btn.textContent='Saving...';btn.disabled=true;";
+    html += "fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp))";
+    html += ".then(r=>r.json()).then(d=>{";
+    html += "btn.textContent='Apply Setpoints';btn.disabled=false;";
+    html += "var s=document.getElementById('sp-saved');s.style.display='inline';";
+    html += "setTimeout(function(){s.style.display='none';},2500);";
+    html += "}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false;});";
+    html += "}";
     html += "setInterval(function(){";
     html += "fetch('/api').then(r=>r.json()).then(d=>{";
     html += "var el=document.getElementById('val-ph');if(el)el.textContent=d.ph.toFixed(2);";
@@ -199,6 +235,17 @@ void handleRoot() {
     html += "el=document.getElementById('sys-mqtt');if(el)el.textContent=d.mqtt?'✅':'❌';";
     html += "el=document.getElementById('sys-mode');";
     html += "if(el)el.innerHTML=d.manual_mode?'<span class=\"manual-badge\">🔧 MANUAL</span>':'<span class=\"auto-badge\">🤖 AUTO</span>';";
+    html += "// Update setpoint sliders from server";
+    html += "if(d.ph_setpoint!==undefined){";
+    html += "var r=document.getElementById('sp-ph-range');";
+    html += "var v=document.getElementById('sp-ph-val');";
+    html += "if(r&&parseFloat(r.value)!==d.ph_setpoint){r.value=d.ph_setpoint;if(v)v.textContent=d.ph_setpoint.toFixed(1);}";
+    html += "}";
+    html += "if(d.orp_setpoint!==undefined){";
+    html += "var r=document.getElementById('sp-orp-range');";
+    html += "var v=document.getElementById('sp-orp-val');";
+    html += "if(r&&parseInt(r.value)!==d.orp_setpoint){r.value=d.orp_setpoint;if(v)v.textContent=d.orp_setpoint;}";
+    html += "}";
     html += "['filter','ph','chlorine'].forEach(function(id){";
     html += "var b=document.getElementById('btn-'+id);";
     html += "var r=document.getElementById('run-'+id);";
@@ -220,6 +267,7 @@ void handleRoot() {
 }
 
 void handleAPI() {
+    AppConfig& cfg = configManager.get();
     StaticJsonDocument<1024> doc;
     doc["uptime_ms"] = millis();
     doc["wifi"] = WiFi.isConnected();
@@ -231,6 +279,10 @@ void handleAPI() {
     doc["water_temp"] = sensorManager ? sensorManager->getWaterTemperature() : 0;
     doc["air_temp"] = sensorManager ? sensorManager->getAirTemperature() : 0;
     doc["filter_pressure"] = sensorManager ? sensorManager->getFilterPressure() : 0;
+
+    // Setpoint values
+    doc["ph_setpoint"] = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
+    doc["orp_setpoint"] = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
 
     // Pump states with runtime
     JsonObject pumps = doc.createNestedObject("pumps");
@@ -354,6 +406,47 @@ void handleAPIAllOff() {
     webServer.send(200, "application/json", json);
 }
 
+void handleAPISetpoint() {
+    AppConfig& cfg = configManager.get();
+    StaticJsonDocument<256> doc;
+    bool changed = false;
+
+    if (webServer.hasArg("ph")) {
+        float ph = webServer.arg("ph").toFloat();
+        if (ph >= 6.0f && ph <= 8.0f) {
+            if (chemistryController) chemistryController->setPHSetpoint(ph);
+            else cfg.phPID.setpoint = ph;
+            doc["ph_setpoint"] = ph;
+            changed = true;
+            log_i("Web: pH setpoint -> %.1f", ph);
+        } else {
+            doc["ph_error"] = "must be 6.0-8.0";
+        }
+    }
+
+    if (webServer.hasArg("orp")) {
+        float orp = webServer.arg("orp").toFloat();
+        if (orp >= 200.0f && orp <= 900.0f) {
+            if (chemistryController) chemistryController->setORPSetpoint(orp);
+            else cfg.chlorinePID.setpoint = orp;
+            doc["orp_setpoint"] = orp;
+            changed = true;
+            log_i("Web: ORP setpoint -> %.0f mV", orp);
+        } else {
+            doc["orp_error"] = "must be 200-900";
+        }
+    }
+
+    if (changed && chemistryController) {
+        configManager.save();
+    }
+
+    doc["ok"] = changed;
+    String json;
+    serializeJson(doc, json);
+    webServer.send(changed ? 200 : 400, "application/json", json);
+}
+
 void setupWebServer() {
     webServer.on("/", handleRoot);
     webServer.on("/api", handleAPI);
@@ -361,6 +454,7 @@ void setupWebServer() {
     webServer.on("/api/pump/set", handleAPIPumpSet);
     webServer.on("/api/manual", handleAPIManualMode);
     webServer.on("/api/alloff", handleAPIAllOff);
+    webServer.on("/api/setpoint", handleAPISetpoint);
     webServer.begin();
     log_i("Web server started on port 80");
 }
