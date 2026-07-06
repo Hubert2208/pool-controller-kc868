@@ -77,7 +77,7 @@ void MQTTManager::subscribeCommands() {
 
 bool MQTTManager::publish(const char* topicSuffix, const String& payload, bool retained) {
     if (!_client.connected()) return false;
-    String fullTopic = _baseTopic + "/" + topicSuffix;
+    String fullTopic = _baseTopic + "/" + String(topicSuffix);
     bool ok = _client.publish(fullTopic.c_str(), payload.c_str(), retained);
     if (!ok) log_w("MQTT publish failed: %s", fullTopic.c_str());
     return ok;
@@ -135,11 +135,11 @@ void MQTTManager::publishDiscovery() {
           "\"state_topic\":\"" + _baseTopic + "/orp_raw\","
           "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_orp\"}");
 
-    disco("sensor", "water_temp", "{\"device_class\":\"temperature\",\"name\":\"Pool Water Temperature\",\"unit_of_measurement\":\"°C\","
+    disco("sensor", "water_temp", "{\"device_class\":\"temperature\",\"name\":\"Pool Water Temperature\",\"unit_of_measurement\":\"\\u00b0C\","
           "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.water_temperature.value }}\","
           "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_wt\"}");
 
-    disco("sensor", "air_temp", "{\"device_class\":\"temperature\",\"name\":\"Air Temperature\",\"unit_of_measurement\":\"°C\","
+    disco("sensor", "air_temp", "{\"device_class\":\"temperature\",\"name\":\"Air Temperature\",\"unit_of_measurement\":\"\\u00b0C\","
           "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.air_temperature.value }}\","
           "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_at\"}");
 
