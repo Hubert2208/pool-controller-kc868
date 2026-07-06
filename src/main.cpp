@@ -122,13 +122,13 @@ void handleRoot() {
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
     html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(e){console.log('Setpoint error:',e);btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "function refreshDashboard(){fetch('/api').then(r=>r.json()).then(d=>{";
-    html += "var el;if(el=document.getElementById('val-ph'))el.textContent=d.ph.toFixed(2);";
-    html += "if(el=document.getElementById('val-orp'))el.textContent=d.orp.toFixed(0);";
-    html += "if(el=document.getElementById('val-water'))el.textContent=d.water_temp.toFixed(1);";
-    html += "if(el=document.getElementById('val-air'))el.textContent=d.air_temp.toFixed(1);";
-    html += "if(el=document.getElementById('val-pressure'))el.textContent=d.filter_pressure.toFixed(2);";
-    html += "if(el=document.getElementById('sys-uptime'))el.textContent=Math.floor(d.uptime_ms/60000);";
+    html += "function refreshDashboard(){fetch('/api?_='+Date.now()).then(r=>r.json()).then(d=>{";
+    html += "var el;if(el=document.getElementById('val-ph'))el.textContent=Number(d.ph).toFixed(2);";
+    html += "if(el=document.getElementById('val-orp'))el.textContent=Number(d.orp).toFixed(0);";
+    html += "if(el=document.getElementById('val-water'))el.textContent=Number(d.water_temp).toFixed(1);";
+    html += "if(el=document.getElementById('val-air'))el.textContent=Number(d.air_temp).toFixed(1);";
+    html += "if(el=document.getElementById('val-pressure'))el.textContent=Number(d.filter_pressure).toFixed(2);";
+    html += "if(el=document.getElementById('sys-uptime'))el.textContent=Math.floor(Number(d.uptime_ms)/60000);";
     html += "if(el=document.getElementById('sys-wifi'))el.textContent=d.wifi?'✅':'❌';";
     html += "if(el=document.getElementById('sys-mqtt'))el.textContent=d.mqtt?'✅':'❌';";
     html += "if(el=document.getElementById('sys-mode'))el.innerHTML=d.manual_mode?'<span class=\"manual-badge\">🔧 MANUAL</span>':'<span class=\"auto-badge\">🤖 AUTO</span>';";
@@ -136,10 +136,10 @@ void handleRoot() {
     html += "if(d.orp_setpoint!==undefined){var r=document.getElementById('sp-orp-range'),v=document.getElementById('sp-orp-val');if(r&&parseInt(r.value)!==d.orp_setpoint){r.value=d.orp_setpoint;if(v)v.textContent=d.orp_setpoint}}";
     html += "if(d.pumps)['filter','ph','chlorine'].forEach(function(id){var b=document.getElementById('btn-'+id),r=document.getElementById('run-'+id);if(b&&d.pumps[id]){var p=d.pumps[id];b.textContent=p.on?'ON':'OFF';b.className='pump-btn '+(p.on?'btn-on':'btn-off');if(r)r.textContent='('+(p.current_min||0)+'m / '+p.today_min+'m today)'}})";
     html += "if(d.relays)for(var i=0;i<d.relays.length;i++){var r=document.getElementById('rel-'+i);if(r){var on=d.relays[i];r.textContent='R'+i+': '+(on?'ON':'OFF');r.className='relay-btn '+(on?'btn-on':'btn-off')}}";
-    html += "}).catch(function(e){console.log('Dashboard refresh error:',e)})}";
-    html += "refreshDashboard();setInterval(refreshDashboard,5000);";
+    html += "}).catch(function(e){console.log('Dashboard refresh error:',e)})};refreshDashboard();setInterval(refreshDashboard,5000);";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
+    webServer.sendHeader("Connection", "close");
     webServer.send(200, "text/html", html);
 }
 
@@ -161,7 +161,10 @@ void handleAPI() {
     if (chlorinePumpCtrl) { JsonObject c = pumps.createNestedObject("chlorine"); c["on"] = chlorinePumpCtrl->isOn(); c["current_min"] = chlorinePumpCtrl->getLastOnDuration() / 60000; c["today_min"] = chlorinePumpCtrl->getRuntimeMinutes(); }
     JsonArray relays = doc.createNestedArray("relays");
     for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) relays.add(relayManager.getRelayState(i));
-    String json; serializeJson(doc, json); webServer.send(200, "application/json", json);
+    String json; serializeJson(doc, json);
+    webServer.sendHeader("Connection", "close");
+    webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    webServer.send(200, "application/json", json);
 }
 
 void handleAPIRelaySet() {
@@ -169,6 +172,7 @@ void handleAPIRelaySet() {
     int channel = webServer.arg("channel").toInt(); bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
     if (channel < 0 || channel >= KC868_A8_RELAY_COUNT) { webServer.send(400, "application/json", "{\"error\":\"bad channel\"}"); return; }
     relayManager.setRelay((uint8_t)channel, state);
+    webServer.sendHeader("Connection", "close");
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 
@@ -180,6 +184,7 @@ void handleAPIPumpSet() {
     if (!pump) { webServer.send(400, "application/json", "{\"error\":\"bad id\"}"); return; }
     bool ok = state ? pump->turnOn() : pump->turnOff();
     String json = "{\"ok\":" + String(ok) + ",\"pump\":\"" + id + "\"}";
+    webServer.sendHeader("Connection", "close");
     webServer.send(200, "application/json", json);
 }
 
@@ -187,10 +192,11 @@ void handleAPIManualMode() {
     if (!webServer.hasArg("mode")) { webServer.send(400, "application/json", "{\"error\":\"missing mode\"}"); return; }
     manualMode = (webServer.arg("mode") == "1" || webServer.arg("mode") == "true");
     if (!manualMode && chemistryController) chemistryController->begin();
+    webServer.sendHeader("Connection", "close");
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 
-void handleAPIAllOff() { relayManager.allOff(); webServer.send(200, "application/json", "{\"ok\":true}"); }
+void handleAPIAllOff() { relayManager.allOff(); webServer.sendHeader("Connection", "close"); webServer.send(200, "application/json", "{\"ok\":true}"); }
 
 void handleAPISetpoint() {
     AppConfig& cfg = configManager.get();
@@ -198,6 +204,7 @@ void handleAPISetpoint() {
     if (webServer.hasArg("ph")) { float ph = webServer.arg("ph").toFloat(); if (ph >= 6.0f && ph <= 8.0f) { if (chemistryController) chemistryController->setPHSetpoint(ph); else cfg.phPID.setpoint = ph; changed = true; } }
     if (webServer.hasArg("orp")) { float orp = webServer.arg("orp").toFloat(); if (orp >= 200.0f && orp <= 900.0f) { if (chemistryController) chemistryController->setORPSetpoint(orp); else cfg.chlorinePID.setpoint = orp; changed = true; } }
     if (changed && chemistryController) configManager.save();
+    webServer.sendHeader("Connection", "close");
     webServer.send(changed ? 200 : 400, "application/json", "{\"ok\":" + String(changed) + "}");
 }
 
