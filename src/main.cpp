@@ -259,18 +259,20 @@ void loop() {
         if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
             lastSensorPublish = now;
 
+            // Dedicated raw-value topics (no JSON parsing needed by HA)
+            if (sensorManager)
+                mqttManager->publish("ph", String(sensorManager->getPH(), 2), false);
+
+            // Composite JSON topics (multiple values per topic)
             // Sensor states via SensorManager::getAllStateJSON()
-            // Matches discovery templates: ph.value, orp.value, water_temperature.value, etc.
             if (sensorManager)
                 mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
 
             // Chemistry controller state via PoolChemistryController::getStateJSON()
-            // Matches: ph.enabled, ph.setpoint, ph.pid_output, chlorine.*, etc.
             if (chemistryController)
                 mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
 
             // Filter pump logic state via FilterPumpLogic::getStateJSON()
-            // Matches: required_runtime_min, in_window, pump_on, etc.
             if (filterPumpLogic)
                 mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
 

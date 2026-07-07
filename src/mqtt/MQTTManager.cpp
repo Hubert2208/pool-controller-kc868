@@ -171,17 +171,19 @@ void MQTTManager::publishDiscovery() {
     char topicBuf[256];
     String payload;
 
-    // ── Sensor entities on pool-controller/sensors ──
-    // JSON format from SensorManager::getAllStateJSON():
-    //   {"ph":{"value":7.2,...},"orp":{"value":400,...},
-    //    "water_temperature":{"value":25,...},"air_temperature":{"value":22,...},
-    //    "filter_pressure":{"value":1.2,"needs_backwash":false,...}}
+    // ── Sensor entities ──
 
+    // Pool pH — dedicated raw-numeric topic (no JSON parsing)
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph").c_str());
     payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\","
-              "\"state_topic\":\"" + _baseTopic + "/sensors\",\"value_template\":\"{{ value_json.ph.value }}\","
+              "\"state_topic\":\"" + _baseTopic + "/ph\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_ph\"}";
     _client.publish(topicBuf, payload.c_str(), true);
+
+    // ── Composite JSON sensors on pool-controller/sensors ──
+    // JSON format from SensorManager::getAllStateJSON():
+    //   {"orp":{"value":400,...},"water_temperature":{"value":25,...},
+    //    "air_temperature":{"value":22,...},"filter_pressure":{"value":1.2,"needs_backwash":false,...}}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "orp").c_str());
     payload = "{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\","
@@ -205,7 +207,6 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     // NOTE: No humidity sensor — SensorManager has no humidity getter.
-    // The pH/ORP sensors are EZO circuits, DS18B20 for temperature, analog pressure sensor.
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "filter_pressure").c_str());
     payload = "{\"device_class\":\"pressure\",\"name\":\"Filter Pressure\",\"unit_of_measurement\":\"bar\","
@@ -290,8 +291,7 @@ void MQTTManager::publishDiscovery() {
     // ── Pump entities on pool-controller/pumps ──
     // JSON format from loop() pumpDoc:
     //   {"ph_pump":{"name":"pH Pump","on":false,"runtime_today_min":12,...},
-    //    "chlorine_pump":{"name":"Chlorine Pump","on":true,"runtime_today_min":8,...},
-    //    "filter_pump":{"name":"Filter Pump","on":true,"runtime_today_min":320,...}}
+    //    "chlorine_pump":{...},"filter_pump":{...}}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph_pump_runtime").c_str());
     payload = "{\"name\":\"pH Pump Runtime Today\",\"unit_of_measurement\":\"min\","
