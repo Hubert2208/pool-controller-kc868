@@ -121,7 +121,7 @@ void handleRoot() {
     html += "</p></div>";
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
-    html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})";
+    html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -245,12 +245,74 @@ void setup() {
 
 void loop() {
     unsigned long loopStart = millis();
-    feedWatchdog(); maintainWiFi();
+    feedWatchdog();
+    maintainWiFi();
     if (mqttManager) mqttManager->loop();
     webServer.handleClient();
     if (sensorManager) sensorManager->update();
     if (chemistryController && systemReady && !manualMode) chemistryController->update();
     if (filterPumpLogic && sensorManager && !manualMode) filterPumpLogic->update(sensorManager->getWaterTemperature());
+
+    // MQTT State Publishing — matches HA Discovery value_template paths
+    if (mqttManager && mqttManager->isConnected() && systemReady) {
+        unsigned long now = millis();
+        if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
+            lastSensorPublish = now;
+
+            // Sensor states via SensorManager::getAllStateJSON()
+            // Matches discovery templates: ph.value, orp.value, water_temperature.value, etc.
+            if (sensorManager)
+                mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
+
+            // Chemistry controller state via PoolChemistryController::getStateJSON()
+            // Matches: ph.enabled, ph.setpoint, ph.pid_output, chlorine.*, etc.
+            if (chemistryController)
+                mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
+
+            // Filter pump logic state via FilterPumpLogic::getStateJSON()
+            // Matches: required_runtime_min, in_window, pump_on, etc.
+            if (filterPumpLogic)
+                mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
+
+            // Pump runtime states
+            StaticJsonDocument<256> pumpDoc;
+            if (phPumpCtrl) {
+                JsonObject ph = pumpDoc.createNestedObject("ph_pump");
+                ph["name"] = phPumpCtrl->getName();
+                ph["on"] = phPumpCtrl->isOn();
+                ph["runtime_today_min"] = phPumpCtrl->getRuntimeMinutes();
+                ph["last_on_duration_ms"] = phPumpCtrl->getLastOnDuration();
+            }
+            if (chlorinePumpCtrl) {
+                JsonObject cl = pumpDoc.createNestedObject("chlorine_pump");
+                cl["name"] = chlorinePumpCtrl->getName();
+                cl["on"] = chlorinePumpCtrl->isOn();
+                cl["runtime_today_min"] = chlorinePumpCtrl->getRuntimeMinutes();
+                cl["last_on_duration_ms"] = chlorinePumpCtrl->getLastOnDuration();
+            }
+            if (filterPumpCtrl) {
+                JsonObject f = pumpDoc.createNestedObject("filter_pump");
+                f["name"] = filterPumpCtrl->getName();
+                f["on"] = filterPumpCtrl->isOn();
+                f["runtime_today_min"] = filterPumpCtrl->getRuntimeMinutes();
+                f["last_on_duration_ms"] = filterPumpCtrl->getLastOnDuration();
+            }
+            String pumpStates;
+            serializeJson(pumpDoc, pumpStates);
+            mqttManager->publish("pumps", pumpStates, false);
+        }
+    }
+
     AppConfig& cfg = configManager.get();
-    int delayMs = cfg.loopDelayMs - (int)(millis() - loopStart); if (delayMs > 0) delay(delayMs);
+    unsigned long elapsed = millis() - loopStart;
+    int delayMs = cfg.loopDelayMs - (int)elapsed;
+    if (delayMs > 0) {
+        delay(delayMs);
+    } else if (delayMs < -100) {
+        static unsigned long lw = 0;
+        if (millis() - lw > 60000) {
+            log_w("Loop overrun: %lu ms (limit %d ms)", elapsed, cfg.loopDelayMs);
+            lw = millis();
+        }
+    }
 }
