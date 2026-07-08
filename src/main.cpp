@@ -33,6 +33,7 @@ static unsigned long lastSensorPublish = 0;
 static const unsigned long SENSOR_PUBLISH_INTERVAL = 30000;
 static unsigned long wifiReconnectTime = 0;
 static bool wifiConnected = false;
+static bool ntpSynced = false;
 static bool systemReady = false;
 static unsigned long startTime = 0;
 static int watchdogCount = 0;
@@ -239,8 +240,15 @@ void setup() {
     filterPumpCtrl->addDependent(phPumpCtrl); filterPumpCtrl->addDependent(chlorinePumpCtrl);
     chemistryController = new PoolChemistryController(configManager, *sensorManager, *phPumpCtrl, *chlorinePumpCtrl); chemistryController->begin();
     setupWiFi(); setupWebServer();
+
+    if (wifiConnected) {
+        ntpSynced = initNTP(7200, 3600);
+        ntpSynced = waitForNTPSync(15);
+    }
+
     mqttManager = new MQTTManager(configManager); mqttManager->begin(); mqttManager->setCommandCallback(handleMQTTCommand);
     startTime = millis(); systemReady = true;
+    log_i("═══ System ready (%lu ms) ═══", millis());
 }
 
 void loop() {
@@ -258,6 +266,7 @@ void loop() {
         unsigned long now = millis();
         if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
             lastSensorPublish = now;
+            log_i("MQTT: publishing sensor states");
 
             // Dedicated raw-value topics (no JSON parsing needed by HA)
             if (sensorManager)
