@@ -202,6 +202,22 @@ void SensorManager::setSimulationMode(bool simulatePH, bool simulateORP) {
     if (_orpSim) _orpSim->reset((unsigned long)millis());
 }
 
+void SensorManager::setPHPumpActive(bool active) {
+    if (_phSim) {
+        // pH pump ON: acid dosing drops pH (~0.5 pH/h at full duty)
+        // pH pump OFF: natural CO₂ outgassing slowly raises pH (~0.03 pH/h)
+        _phSim->setExternalDrift(active ? -0.5f : 0.03f);
+    }
+}
+
+void SensorManager::setChlorinePumpActive(bool active) {
+    if (_orpSim) {
+        // Chlorine pump ON: raises ORP (~40 mV/h at full duty)
+        // Chlorine pump OFF: natural degradation lowers ORP (~5 mV/h)
+        _orpSim->setExternalDrift(active ? 40.0f : -5.0f);
+    }
+}
+
 String SensorManager::getAllStateJSON() {
     StaticJsonDocument<1024> doc;
 

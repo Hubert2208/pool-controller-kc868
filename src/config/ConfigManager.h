@@ -22,6 +22,7 @@ struct PIDParams {
     float outputMax = 100.0;
     int minOnTimeSec = 10;
     int minOffTimeSec = 60;
+    bool reverseActing = false;  // true = output rises when input > setpoint (e.g. acid pump)
 
     String toJson() const;
     static PIDParams fromJson(JsonVariantConst json);

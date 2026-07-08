@@ -13,6 +13,7 @@ PIDController::PIDController()
     , _iTerm(0.0f)
     , _dTerm(0.0f)
     , _enabled(true)
+    , _reverseActing(false)
     , _firstRun(true)
 {
 }
@@ -30,6 +31,7 @@ PIDController::PIDController(float kp, float ki, float kd)
     , _iTerm(0.0f)
     , _dTerm(0.0f)
     , _enabled(true)
+    , _reverseActing(false)
     , _firstRun(true)
 {
 }
@@ -71,6 +73,12 @@ float PIDController::compute(float input, float dtSec) {
     if (dtSec > 5.0f) dtSec = 5.0f;
 
     float error = _setpoint - input;
+
+    // Reverse acting: flip error sign so output rises when input exceeds setpoint
+    // Used for acid-dosing pH pumps where pump must run when pH is too high
+    if (_reverseActing) {
+        error = -error;
+    }
 
     // Calculate proportional term
     _pTerm = _kp * error;

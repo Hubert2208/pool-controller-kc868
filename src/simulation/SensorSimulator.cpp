@@ -6,6 +6,7 @@ SensorSimulator::SensorSimulator()
     , _driftPerHour(1.0f)
     , _currentValue(50.0f)
     , _target(50.0f)
+    , _externalDrift(0.0f)
     , _lastUpdate(0)
     , _seed(0)
 {
@@ -17,6 +18,7 @@ SensorSimulator::SensorSimulator(float minVal, float maxVal, float driftPerHour)
     , _driftPerHour(driftPerHour)
     , _currentValue((minVal + maxVal) / 2.0f)
     , _target((minVal + maxVal) / 2.0f)
+    , _externalDrift(0.0f)
     , _lastUpdate(0)
     , _seed(0)
 {
@@ -73,7 +75,7 @@ void SensorSimulator::update() {
     float pull = diff * pullStrength;
     float noise = randomWalkStep() * maxStep * 0.3f;
 
-    _currentValue += pull + noise;
+    _currentValue += pull + noise + (_externalDrift * deltaHours);
 
     // Clamp to range
     _currentValue = max(_minVal, min(_maxVal, _currentValue));

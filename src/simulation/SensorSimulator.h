@@ -16,6 +16,10 @@ public:
     // Update the simulated value — call periodically
     void update();
 
+    // Set external influence (pump effect) in units per hour
+    // Positive = value rises, negative = value falls
+    void setExternalDrift(float driftPerHour) { _externalDrift = driftPerHour; }
+
     // Get the current simulated value
     float getValue() const { return _currentValue; }
 
@@ -31,6 +35,7 @@ private:
     float _driftPerHour;
     float _currentValue;
     float _target;
+    float _externalDrift;
     unsigned long _lastUpdate;
     unsigned long _seed;
 

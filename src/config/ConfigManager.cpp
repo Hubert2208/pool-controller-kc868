@@ -11,6 +11,7 @@ String PIDParams::toJson() const {
     doc["setpoint"] = setpoint;
     doc["outputMin"] = outputMin;
     doc["outputMax"] = outputMax;
+    doc["reverseActing"] = reverseActing;
     doc["minOnTimeSec"] = minOnTimeSec;
     doc["minOffTimeSec"] = minOffTimeSec;
     String out;
@@ -27,6 +28,7 @@ PIDParams PIDParams::fromJson(JsonVariantConst json) {
         p.setpoint = json["setpoint"] | p.setpoint;
         p.outputMin = json["outputMin"] | p.outputMin;
         p.outputMax = json["outputMax"] | p.outputMax;
+        p.reverseActing = json["reverseActing"] | p.reverseActing;
         p.minOnTimeSec = json["minOnTimeSec"] | p.minOnTimeSec;
         p.minOffTimeSec = json["minOffTimeSec"] | p.minOffTimeSec;
     }
@@ -213,6 +215,7 @@ String AppConfig::toJson() const {
     phPidObj["setpoint"] = phPID.setpoint;
     phPidObj["outputMin"] = phPID.outputMin;
     phPidObj["outputMax"] = phPID.outputMax;
+    phPidObj["reverseActing"] = phPID.reverseActing;
     phPidObj["minOnTimeSec"] = phPID.minOnTimeSec;
     phPidObj["minOffTimeSec"] = phPID.minOffTimeSec;
 
@@ -223,6 +226,7 @@ String AppConfig::toJson() const {
     clPidObj["setpoint"] = chlorinePID.setpoint;
     clPidObj["outputMin"] = chlorinePID.outputMin;
     clPidObj["outputMax"] = chlorinePID.outputMax;
+    clPidObj["reverseActing"] = chlorinePID.reverseActing;
     clPidObj["minOnTimeSec"] = chlorinePID.minOnTimeSec;
     clPidObj["minOffTimeSec"] = chlorinePID.minOffTimeSec;
 
@@ -462,6 +466,7 @@ bool ConfigManager::updateFromJson(const String& json) {
         if (src["setpoint"].is<float>()) dst.setpoint = src["setpoint"];
         if (src["outputMin"].is<float>()) dst.outputMin = src["outputMin"];
         if (src["outputMax"].is<float>()) dst.outputMax = src["outputMax"];
+        if (src["reverseActing"].is<bool>()) dst.reverseActing = src["reverseActing"];
         if (src["minOnTimeSec"].is<int>()) dst.minOnTimeSec = src["minOnTimeSec"];
         if (src["minOffTimeSec"].is<int>()) dst.minOffTimeSec = src["minOffTimeSec"];
     };

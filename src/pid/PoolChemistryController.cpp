@@ -23,10 +23,12 @@ void PoolChemistryController::begin() {
 
     _phPID.setTunings(cfg.phPID.kp, cfg.phPID.ki, cfg.phPID.kd);
     _phPID.setSetpoint(cfg.phPID.setpoint);
+    _phPID.setReverseActing(cfg.phPID.reverseActing);
     _phPID.setOutputLimits(cfg.phPID.outputMin, cfg.phPID.outputMax);
 
     _chlorinePID.setTunings(cfg.chlorinePID.kp, cfg.chlorinePID.ki, cfg.chlorinePID.kd);
     _chlorinePID.setSetpoint(cfg.chlorinePID.setpoint);
+    _chlorinePID.setReverseActing(cfg.chlorinePID.reverseActing);
     _chlorinePID.setOutputLimits(cfg.chlorinePID.outputMin, cfg.chlorinePID.outputMax);
 
     log_i("Pool chemistry controller initialized");
@@ -80,6 +82,7 @@ void PoolChemistryController::updatePHPID(float dtSec) {
             if (_phPump.getRuntimeToday() < (unsigned long)(cfg.phPump.maxDailyRuntimeMin * 60000)) {
                 _phPump.turnOn();
                 _lastPHCycleStart = now;
+                _sensors.setPHPumpActive(true);
                 log_i("pH pump ON (output=%.1f%%, pH=%.2f, setpoint=%.2f)",
                       pidOutput, currentPH, cfg.phPID.setpoint);
             }
@@ -89,12 +92,14 @@ void PoolChemistryController::updatePHPID(float dtSec) {
         unsigned long onDuration = now - _lastPHCycleStart;
         if (onDuration >= (unsigned long)(cfg.phPID.minOnTimeSec * 1000)) {
             _phPump.turnOff();
+            _sensors.setPHPumpActive(false);
             log_i("pH pump OFF (output=%.1f%%, pH=%.2f)", pidOutput, currentPH);
         }
     } else if (_phPump.isOn()) {
         // Safety: force off if max daily runtime exceeded
         if (_phPump.getRuntimeToday() >= (unsigned long)(cfg.phPump.maxDailyRuntimeMin * 60000)) {
             _phPump.forceOff();
+            _sensors.setPHPumpActive(false);
             log_w("pH pump force OFF (daily limit reached)");
         }
     }
@@ -117,6 +122,7 @@ void PoolChemistryController::updateChlorinePID(float dtSec) {
             if (_chlorinePump.getRuntimeToday() < (unsigned long)(cfg.chlorinePump.maxDailyRuntimeMin * 60000)) {
                 _chlorinePump.turnOn();
                 _lastChlorineCycleStart = now;
+                _sensors.setChlorinePumpActive(true);
                 log_i("Chlorine pump ON (output=%.1f%%, ORP=%.0f, setpoint=%.0f)",
                       pidOutput, currentORP, cfg.chlorinePID.setpoint);
             }
@@ -125,11 +131,13 @@ void PoolChemistryController::updateChlorinePID(float dtSec) {
         unsigned long onDuration = now - _lastChlorineCycleStart;
         if (onDuration >= (unsigned long)(cfg.chlorinePID.minOnTimeSec * 1000)) {
             _chlorinePump.turnOff();
+            _sensors.setChlorinePumpActive(false);
             log_i("Chlorine pump OFF (output=%.1f%%, ORP=%.0f)", pidOutput, currentORP);
         }
     } else if (_chlorinePump.isOn()) {
         if (_chlorinePump.getRuntimeToday() >= (unsigned long)(cfg.chlorinePump.maxDailyRuntimeMin * 60000)) {
             _chlorinePump.forceOff();
+            _sensors.setChlorinePumpActive(false);
             log_w("Chlorine pump force OFF (daily limit reached)");
         }
     }

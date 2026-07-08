@@ -63,6 +63,7 @@ inline void apply(AppConfig& _config) {
     _config.phPID.setpoint      = 7.2f;
     _config.phPID.minOnTimeSec  = 15;
     _config.phPID.minOffTimeSec = 60;
+    _config.phPID.reverseActing = true;   // acid pump: pH must drop when pump runs
 
     _config.chlorinePID.kp            = 0.8f;
     _config.chlorinePID.ki            = 0.05f;
@@ -70,6 +71,7 @@ inline void apply(AppConfig& _config) {
     _config.chlorinePID.setpoint      = 650.0f;
     _config.chlorinePID.minOnTimeSec  = 30;
     _config.chlorinePID.minOffTimeSec = 120;
+    _config.chlorinePID.reverseActing = false;  // chlorine pump: ORP must rise when pump runs
 }
 
 } // namespace SetDefaults

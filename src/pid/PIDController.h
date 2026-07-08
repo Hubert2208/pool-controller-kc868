@@ -14,6 +14,9 @@ public:
     // Set the target value
     void setSetpoint(float sp);
 
+    // Set reverse acting mode (true = output rises when input > setpoint)
+    void setReverseActing(bool reverse) { _reverseActing = reverse; }
+
     // Set output clamping range
     void setOutputLimits(float min, float max);
 
@@ -46,6 +49,7 @@ private:
     float _lastInput;
     float _pTerm, _iTerm, _dTerm;
     bool _enabled;
+    bool _reverseActing;
     bool _firstRun;
 };
 

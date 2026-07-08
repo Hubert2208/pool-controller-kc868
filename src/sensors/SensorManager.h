@@ -40,6 +40,10 @@ public:
     SensorSimulator* getPHSimulator() { return _phSim; }
     SensorSimulator* getORPSimulator() { return _orpSim; }
 
+    // Set pump influence on simulation (pH: acid dosing ↓, ORP: chlorine dosing ↑)
+    void setPHPumpActive(bool active);
+    void setChlorinePumpActive(bool active);
+
 private:
     ConfigManager& _config;
 
