@@ -60,9 +60,21 @@ void PoolChemistryController::update() {
         _chlorinePump.forceOff();
     }
 
-    // Update simulation with current pump states for pump-aware drift
-    _sensors.setPHPumpActive(_phPump.isOn());
-    _sensors.setChlorinePumpActive(_chlorinePump.isOn());
+    // Update simulation with proportional pump influence based on PID output
+    // pH pump: ON → -0.1/h per % output; OFF → +0.02/h (CO₂ outgassing)
+    // Chlorine pump: ON → +20/h per % output; OFF → -5/h (degradation)
+    if (_phEnabled) {
+        float phPumpInfluence = _phPump.isOn()
+            ? _lastPHOutput * (-0.1f)      // acid dosing: pH drops proportionally
+            : 0.02f;                         // natural CO₂ outgassing
+        _sensors.setPHPumpInfluence(phPumpInfluence);
+    }
+    if (_chlorineEnabled) {
+        float clPumpInfluence = _chlorinePump.isOn()
+            ? _lastChlorineOutput * 20.0f   // chlorine dosing: ORP rises proportionally
+            : -5.0f;                          // natural chlorine degradation
+        _sensors.setChlorinePumpInfluence(clPumpInfluence);
+    }
 }
 
 void PoolChemistryController::updatePHPID(float dtSec) {

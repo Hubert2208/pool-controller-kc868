@@ -25,17 +25,10 @@ public:
     // Force a specific value
     void setValue(float val) { _currentValue = val; }
 
-    // Pump-aware simulation: pump ON → directed effect; pump OFF → natural drift
-    void setPumpActive(bool active) { _pumpActive = active; }
-    bool isPumpActive() const { return _pumpActive; }
-
-    // Set drift rates:
-    //   naturalDriftPerHour: drift when pump is OFF (positive = rising, negative = falling)
-    //   pumpDriftPerHour:   effect when pump is ON (positive = rising, negative = falling)
-    void setPumpDriftRates(float naturalDriftPerHour, float pumpDriftPerHour) {
-        _naturalDriftPerHour = naturalDriftPerHour;
-        _pumpDriftPerHour = pumpDriftPerHour;
-    }
+    // Set pump influence on the simulated value (effect per hour)
+    // Positive = value rises, negative = value falls
+    // Caller computes: pumpOutputPercent × effectCoefficient
+    void setPumpInfluence(float influencePerHour) { _pumpInfluence = influencePerHour; }
 
 private:
     float _minVal;
@@ -49,10 +42,8 @@ private:
     // Random walk step
     float randomWalkStep();
 
-    // Pump-aware simulation state
-    bool _pumpActive = false;
-    float _naturalDriftPerHour = 0.0f;   // drift when pump OFF
-    float _pumpDriftPerHour = 0.0f;      // extra effect when pump ON
+    // Pump chemistry influence (proportional to PID output)
+    float _pumpInfluence = 0.0f;
 };
 
 #endif // SENSOR_SIMULATOR_H

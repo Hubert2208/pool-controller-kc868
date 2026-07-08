@@ -124,14 +124,6 @@ bool SensorManager::begin() {
         cfg.pressureSensor.simMin, cfg.pressureSensor.simMax, cfg.pressureSensor.simDriftPerHour
     );
 
-    // Configure pump-aware simulation drift rates
-    // pH: natural drift up (+0.15/h) -- pool pH rises without dosing
-    //     pump ON drops pH (-0.8/h) -- pH-minus dosing effect
-    if (_phSim) _phSim->setPumpDriftRates(0.15f, -0.8f);
-    // ORP: natural decay (-8 mV/h) -- chlorine degrades without dosing
-    //      pump ON raises ORP (+40 mV/h) -- chlorine dosing effect
-    if (_orpSim) _orpSim->setPumpDriftRates(-8.0f, 40.0f);
-
     log_i("Sensor manager initialized with %d real sensors + simulation fallbacks", _sensorCount);
     return true;
 }
@@ -210,12 +202,12 @@ void SensorManager::setSimulationMode(bool simulatePH, bool simulateORP) {
     if (_orpSim) _orpSim->reset((unsigned long)millis());
 }
 
-void SensorManager::setPHPumpActive(bool active) {
-    if (_phSim) _phSim->setPumpActive(active);
+void SensorManager::setPHPumpInfluence(float influencePerHour) {
+    if (_phSim) _phSim->setPumpInfluence(influencePerHour);
 }
 
-void SensorManager::setChlorinePumpActive(bool active) {
-    if (_orpSim) _orpSim->setPumpActive(active);
+void SensorManager::setChlorinePumpInfluence(float influencePerHour) {
+    if (_orpSim) _orpSim->setPumpInfluence(influencePerHour);
 }
 
 String SensorManager::getAllStateJSON() {

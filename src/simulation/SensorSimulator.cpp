@@ -75,12 +75,8 @@ void SensorSimulator::update() {
 
     _currentValue += pull + noise;
 
-    // Apply pump-aware directional drift (pump chemistry effect)
-    if (_pumpActive) {
-        _currentValue += _pumpDriftPerHour * deltaHours;
-    } else {
-        _currentValue += _naturalDriftPerHour * deltaHours;
-    }
+    // Apply pump chemistry influence (proportional to PID output, pre-computed by caller)
+    _currentValue += _pumpInfluence * deltaHours;
 
     // Clamp to range
     _currentValue = max(_minVal, min(_maxVal, _currentValue));

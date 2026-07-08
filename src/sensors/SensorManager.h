@@ -32,9 +32,9 @@ public:
     SensorSimulator* getPHSimulator() { return _phSim; }
     SensorSimulator* getORPSimulator() { return _orpSim; }
 
-    // Pump state for simulation (pump-aware drift)
-    void setPHPumpActive(bool active);
-    void setChlorinePumpActive(bool active);
+    // Set pump influence on simulation (computed from PID output % × coefficient)
+    void setPHPumpInfluence(float influencePerHour);
+    void setChlorinePumpInfluence(float influencePerHour);
 
 private:
     ConfigManager& _config;
