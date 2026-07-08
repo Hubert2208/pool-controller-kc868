@@ -24,7 +24,6 @@ public:
 
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
-    void resetDailyRuntime() const;
 
     // Dependents: pumps that may only run when this pump is running.
     // When this pump stops, all dependents are force-stopped.
