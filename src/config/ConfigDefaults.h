@@ -3,23 +3,39 @@
 
 #include "ConfigManager.h"
 
+// Include local secrets if available (not committed to git)
+#if __has_include("secrets.h")
+  #include "secrets.h"
+  #define DEFAULT_WIFI_SSID     SECRET_WIFI_SSID
+  #define DEFAULT_WIFI_PASSWORD SECRET_WIFI_PASSWORD
+  #define DEFAULT_MQTT_BROKER   SECRET_MQTT_BROKER
+  #define DEFAULT_MQTT_USERNAME SECRET_MQTT_USERNAME
+  #define DEFAULT_MQTT_PASSWORD SECRET_MQTT_PASSWORD
+#else
+  #define DEFAULT_WIFI_SSID     "YOUR_WIFI_SSID"
+  #define DEFAULT_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+  #define DEFAULT_MQTT_BROKER   "192.168.178.100"
+  #define DEFAULT_MQTT_USERNAME ""
+  #define DEFAULT_MQTT_PASSWORD ""
+#endif
+
 namespace SetDefaults {
 
 inline void apply(AppConfig& _config) {
-    // ─── WiFi defaults (from ConfigManager.h struct) ───
-    _config.wifi.ssid        = "Mayer2";
-    _config.wifi.password    = "Moritz26tOR";
+    // ─── WiFi defaults ───
+    _config.wifi.ssid        = DEFAULT_WIFI_SSID;
+    _config.wifi.password    = DEFAULT_WIFI_PASSWORD;
     _config.wifi.hostname    = "poolcontroller";
     _config.wifi.fallbackAP  = false;
     _config.wifi.apSSID      = "PoolController-AP";
     _config.wifi.apPassword  = "12345678";
 
-    // ─── MQTT defaults (from ConfigManager.h struct) ───
-    _config.mqtt.broker      = "192.168.178.223";
+    // ─── MQTT defaults ───
+    _config.mqtt.broker      = DEFAULT_MQTT_BROKER;
     _config.mqtt.port        = 1883;
     _config.mqtt.clientId    = "poolcontroller";
-    _config.mqtt.username    = "";
-    _config.mqtt.password    = "";
+    _config.mqtt.username    = DEFAULT_MQTT_USERNAME;
+    _config.mqtt.password    = DEFAULT_MQTT_PASSWORD;
     _config.mqtt.baseTopic   = "pool";
     _config.mqtt.keepAliveSec = 60;
 

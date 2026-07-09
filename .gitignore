@@ -9,3 +9,6 @@ __pycache__/
 Thumbs.db
 data/config.json
 !data/config.json.example
+
+# Local secrets — never commit real credentials
+src/config/secrets.h
