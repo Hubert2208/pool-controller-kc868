@@ -13,6 +13,22 @@
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
 
+// Include local secrets if available (not committed to git)
+#if __has_include("secrets.h")
+  #include "secrets.h"
+  #define DEFAULT_WIFI_SSID     SECRET_WIFI_SSID
+  #define DEFAULT_WIFI_PASSWORD SECRET_WIFI_PASSWORD
+  #define DEFAULT_MQTT_BROKER   SECRET_MQTT_BROKER
+  #define DEFAULT_MQTT_USERNAME SECRET_MQTT_USERNAME
+  #define DEFAULT_MQTT_PASSWORD SECRET_MQTT_PASSWORD
+#else
+  #define DEFAULT_WIFI_SSID     "YOUR_WIFI_SSID"
+  #define DEFAULT_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+  #define DEFAULT_MQTT_BROKER   "192.168.178.100"
+  #define DEFAULT_MQTT_USERNAME ""
+  #define DEFAULT_MQTT_PASSWORD ""
+#endif
+
 struct PIDParams {
     float kp = 1.0;
     float ki = 0.1;
@@ -41,8 +57,8 @@ struct SensorConfig {
 };
 
 struct WifiConfig {
-    String ssid = "Mayer2";
-    String password = "Moritz26tOR";
+    String ssid = DEFAULT_WIFI_SSID;
+    String password = DEFAULT_WIFI_PASSWORD;
     String hostname = "poolcontroller";
     bool fallbackAP = false;
     String apSSID = "PoolController-AP";
@@ -53,11 +69,11 @@ struct WifiConfig {
 };
 
 struct MqttConfig {
-    String broker = "192.168.178.223";
+    String broker = DEFAULT_MQTT_BROKER;
     int port = 1883;
     String clientId = "poolcontroller";
-    String username = "";
-    String password = "";
+    String username = DEFAULT_MQTT_USERNAME;
+    String password = DEFAULT_MQTT_PASSWORD;
     String baseTopic = "pool";
     int keepAliveSec = 60;
 
