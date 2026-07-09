@@ -33,7 +33,7 @@ Stellgröße(t) = Kp × e(t) + Ki × ∫e(t) dt + Kd × de(t)/dt
 ```
 
 Wobei:
-- **e(t)** = Regelabweichung (Sollwert − Istwert)
+- **e(t)** = Regelabweichung (Sollwert − Istwert, mit Richtungsumkehr via `reverseAction`)
 - **Kp** = Proportionalverstärkung
 - **Ki** = Integralverstärkung
 - **Kd** = Differentialverstärkung
@@ -60,8 +60,9 @@ Regelabweichung** des P-Anteils.
 
 #### D-Anteil (Differential)
 
-Reagiert auf die **Änderungsgeschwindigkeit** der Abweichung. Wirkt wie ein
-"Dämpfer".
+Reagiert auf die **Änderungsgeschwindigkeit** des Messwerts (nicht des Fehlers!).
+Wirkt wie ein "Dämpfer". **Derivative-on-Measurement** verhindert
+"derivative kick" bei Sollwert-Änderungen.
 
 - **Positiv**: Reduziert Überschwingen, stabilisiert
 - **Negativ**: Empfindlich gegenüber Rauschen
@@ -78,12 +79,12 @@ Die Poolchemie-Regelung unterscheidet sich von industriellen PID-Anwendungen:
 | **Störgrößen** | Wetter, Nutzung, pH→ORP-Kopplung | Konstant |
 | **Messrauschen** | Gering (Mittelwert) | Variabel |
 | **Stellglied** | Relais (Ein/Aus) | Analog (0-100%) |
-| **Regelstrategie** | Zeitproportional | Kontinuierlich |
+| **Regelstrategie** | Bang-Bang mit PID-Schwelle | Kontinuierlich |
 
-> **Wichtig:** Die PID-Regler im Pool-Controller arbeiten als
-> **zeitproportionale Regler** – die Stellgröße (0-100 %) wird in Ein/Aus-Zyklen
-> der Dosierpumpe übersetzt. Eine Stellgröße von 50 % bedeutet: Pumpe läuft
-> 50 % der Zykluszeit.
+> **Wichtig:** Der Pool-Controller verwendet einen **Bang-Bang-Ansatz** mit
+> PID-Stellgröße: Die Pumpe wird EINgeschaltet, wenn die PID-Stellgröße > 5%
+> beträgt und alle Sicherheitsbedingungen erfüllt sind. Die PID-Stellgröße
+> selbst ist kontinuierlich (0-100%), aber der Ausgang ist binär.
 
 ---
 
@@ -100,7 +101,6 @@ werden (typisch **pH 7,2**). Die Dosierung erfolgt ausschließlich **mit Säure*
 - **Komfort**: Optimaler pH-Wert für Badegäste (Augen-/Hautreizung minimal)
 - **Wirksamkeit**: Chlor desinfiziert am besten bei pH 7,0–7,4
 - **Materialschutz**: Korrosion von Metallteilen minimal
-- **Flockung**: Aluminiumflockungsmittel arbeiten optimal bei pH 7,0–7,4
 
 ### Regelkreis
 
@@ -114,38 +114,41 @@ werden (typisch **pH 7,2**). Die Dosierung erfolgt ausschließlich **mit Säure*
                      └───── pH-Sensor ←──────┘
 ```
 
-### Prozessbeschreibung
+### Reverse Action
 
-1. **pH-Sensor** misst den aktuellen pH-Wert (alle 5 s)
-2. **PID-Regler** berechnet Stellgröße aus Soll-/Istwert-Differenz
-3. **Stellgröße** wird in Einschaltdauer der Dosierpumpe übersetzt
-4. **Säure wird dosiert** → pH-Wert sinkt
-5. **Filterpumpe** sorgt für Durchmischung
-6. **Nächster Messzyklus** beginnt
+Die pH-Regelung verwendet **`reverseAction: true`**:
 
-### Regelstrategie
+- **Reverse Acting**: Wenn der Istwert ÜBER dem Sollwert liegt → POSITIVE Stellgröße
+- **Grund**: pH-Minus (Säure) SENKT den pH-Wert → mehr Dosierung = niedrigerer pH
 
-- **Nur Absenken**: Die pH-Pumpe dosiert ausschließlich Säure (pH-Minus)
-- **Kein Anheben**: Ein zu niedriger pH-Wert wird nicht durch Base korrigiert
-  (sondern sinkt durch CO₂-Austritt natürlicherweise)
-- **Deadband**: ±0,05 pH um den Sollwert (verhindert Kurzzyklen)
-- **Anti-Windup**: Der I-Anteil wird begrenzt, damit er nicht "aufläuft"
+```
+error = input − setpoint   (reverseAction = true)
+→ pH 7.4 > Sollwert 7.2 → error = +0.2 → positive Stellgröße → Pumpe EIN
+→ pH 7.0 < Sollwert 7.2 → error = −0.2 → Stellgröße = 0     → Pumpe AUS
+```
 
-### Stellgrößen-Begrenzung
+### Standard-Parameter
 
 | Parameter | Wert | Bedeutung |
 |-----------|------|-----------|
-| `outputMin` | 0,0 % | Minimale Pumpenleistung (de facto Aus) |
-| `outputMax` | 100,0 % | Maximale Pumpenleistung |
-| `minOnTimeSec` | 30 s | **Kürzester Einschaltzyklus** (Sicherheit) |
-| `minOffTimeSec` | 120 s | **Kürzester Ausschaltzyklus** (Sicherheit) |
+| `kp` | 1.2 | Proportionalverstärkung |
+| `ki` | 0.08 | Integralverstärkung |
+| `kd` | 0.04 | Differentialverstärkung |
+| `setpoint` | 7.2 | pH-Sollwert |
+| `outputMin` | 0.0 % | Minimale Stellgröße |
+| `outputMax` | 100.0 % | Maximale Stellgröße |
+| `minOnTimeSec` | 15 s | Kürzester Einschaltzyklus |
+| `minOffTimeSec` | 60 s | Kürzester Ausschaltzyklus |
+| `reverseAction` | true | Reverse acting (pH-Minus) |
 
-Die zeitproportionale Umsetzung:
+### Bang-Bang-Logik
+
 ```
-Stellgröße = 50 %, Zykluszeit = 300 s
-→ Pumpe EIN für 150 s, dann AUS für 150 s
-→ Aber minOnTime = 30 s, minOffTime = 120 s
-→ Tatsächlich: EIN 150 s, AUS 150 s (beide > Minimum → OK)
+PID-Ausgang > 5% UND minOffTime abgelaufen UND Tageslimit nicht erreicht
+    → Pumpe EIN
+
+PID-Ausgang ≤ 5% UND minOnTime abgelaufen
+    → Pumpe AUS
 ```
 
 ---
@@ -160,10 +163,34 @@ der **ORP-Wert (Oxidation-Reduction Potential)** als Indikator verwendet.
 
 **Typischer ORP-Sollwert: 650–750 mV**
 
-### Zusammenhang ORP ↔ Freies Chlor
+### Direct Action
 
-Der ORP-Wert korreliert mit der Desinfektionswirkung, ist aber **nicht linear**
-zum freien Chlorgehalt:
+Die Chlor-Regelung verwendet **`reverseAction: false`** (direct acting):
+
+- **Direct Acting**: Wenn der Istwert UNTER dem Sollwert liegt → POSITIVE Stellgröße
+- **Grund**: Chlor-Dosierung ERHÖHT den ORP-Wert → mehr Dosierung = höherer ORP
+
+```
+error = setpoint − input   (reverseAction = false)
+→ ORP 600 < Sollwert 650 → error = +50 → positive Stellgröße → Pumpe EIN
+→ ORP 700 > Sollwert 650 → error = −50 → Stellgröße = 0      → Pumpe AUS
+```
+
+### Standard-Parameter
+
+| Parameter | Wert | Bedeutung |
+|-----------|------|-----------|
+| `kp` | 0.8 | Proportionalverstärkung |
+| `ki` | 0.05 | Integralverstärkung |
+| `kd` | 0.02 | Differentialverstärkung |
+| `setpoint` | 650 mV | ORP-Sollwert |
+| `outputMin` | 0.0 % | Minimale Stellgröße |
+| `outputMax` | 100.0 % | Maximale Stellgröße |
+| `minOnTimeSec` | 30 s | Kürzester Einschaltzyklus |
+| `minOffTimeSec` | 120 s | Kürzester Ausschaltzyklus |
+| `reverseAction` | false | Direct acting (Chlor) |
+
+### Zusammenhang ORP ↔ Freies Chlor
 
 | ORP (mV) | Freies Chlor (ca.)* | Desinfektion |
 |----------|--------------------|-------------|
@@ -183,29 +210,6 @@ zum freien Chlorgehalt:
 | Temperatur ↑ | +5 °C | ORP ↓ ca. 20 mV |
 | Cyanursäure ↑ | +30 ppm | ORP ↓ ca. 100 mV |
 | Freies Chlor ↑ | +1 ppm | ORP ↑ ca. 50 mV |
-
-### Regelkreis
-
-Der ORP-Regelkreis ist analog zum pH-Regelkreis aufgebaut, jedoch mit
-**trägerem Verhalten** und niedrigeren PID-Werten:
-
-```
-                         Störgrößen (pH, Temperatur, CYA, Nutzung)
-                            ↓
-    Sollwert ──→ ┌─────┐    ↓    ┌───────────┐    Istwert
-    (650 mV) ──→ │ PID │───→│ Chlor-Pumpe │───→│ Pool │───→ ORP
-                  └─────┘    └───────────┘    └───────┘
-                     ↑                          │
-                     └── ORP-Sensor ←───────────┘
-```
-
-### Besonderheiten
-
-- **Längere Totzeit**: ORP-Änderungen brauchen 30–120 min (Chlor braucht Zeit)
-- **Gekoppelt mit pH**: pH-Änderungen beeinflussen ORP
-- **Nichtlinear**: ORP reagiert im unteren Bereich empfindlicher
-- **Cyanursäure**: Reduziert ORP massiv (Chlor liegt gebunden vor)
-- **Temperatur**: Warmes Wasser reduziert ORP bei gleichem Chlorgehalt
 
 ---
 
@@ -227,70 +231,64 @@ Der ORP-Regelkreis ist analog zum pH-Regelkreis aufgebaut, jedoch mit
 Ki = 0, Kd = 0, Kp variieren
 ```
 
-1. Starte mit **Kp = 1.0**
+1. Starte mit **Kp = 0.5**
 2. Beobachte das Verhalten über 2–4 h
-3. Erhöhe Kp schrittweise um 0,5
+3. Erhöhe Kp schrittweise um 0.2
 4. Sobald der pH-Wert oszilliert, Kp um 30 % zurücknehmen
 5. Optimal: pH erreicht Sollwert, bleibt aber etwas darunter (Regelabweichung)
 
 #### Schritt 2: I-Anteil hinzufügen
 
 ```
-Kp = optimal (o. g.), Ki = 0.02, Kd = 0
+Kp = optimal, Ki = 0.02, Kd = 0
 ```
 
 1. Starte mit **Ki = 0.02**
 2. Beobachte über 4–8 h
 3. Der I-Anteil beseitigt die Regelabweichung
-4. Erhöhe Ki schrittweise (0.02 → 0.05 → 0.1)
+4. Erhöhe Ki schrittweise (0.02 → 0.05 → 0.08)
 5. Bei Überschwingen: Ki reduzieren
 
 #### Schritt 3: D-Anteil zur Stabilisierung
 
 ```
-Kp = optimal, Ki = optimal, Kd = 0.2
+Kp = optimal, Ki = optimal, Kd = 0.02
 ```
 
-1. Starte mit **Kd = 0.2**
-2. Der D-Anteil dämpft Überschwingen
+1. Starte mit **Kd = 0.02**
+2. Der D-Anteil dämpft Überschwingen (Derivative-on-Measurement)
 3. Bei Rauschanfälligkeit: Kd reduzieren
 
-#### Empfohlene Werte
+#### Empfohlene Werte pH
 
 | Parameter | Standard | Aggressiv | Konservativ |
 |-----------|----------|-----------|-------------|
-| Kp | 2,0 | 3,0 | 1,0 |
-| Ki | 0,1 | 0,2 | 0,05 |
-| Kd | 0,5 | 0,8 | 0,2 |
-| setpoint | 7,2 | 7,0 | 7,4 |
-| minOnTime | 30 s | 20 s | 60 s |
-| minOffTime | 120 s | 60 s | 180 s |
-| deadband | 0,05 | 0,02 | 0,10 |
+| Kp | 1.2 | 2.0 | 0.8 |
+| Ki | 0.08 | 0.15 | 0.04 |
+| Kd | 0.04 | 0.08 | 0.02 |
+| setpoint | 7.2 | 7.0 | 7.4 |
+| minOnTime | 15 s | 10 s | 30 s |
+| minOffTime | 60 s | 30 s | 120 s |
 
-### Schritt-für-Schritt-Tuning ORP
-
-ORP-Tuning folgt dem gleichen Schema, ist aber **träger**:
-
-#### Empfohlene Werte
+#### Empfohlene Werte ORP
 
 | Parameter | Standard | Aggressiv | Konservativ |
 |-----------|----------|-----------|-------------|
-| Kp | 1,0 | 1,5 | 0,5 |
-| Ki | 0,05 | 0,10 | 0,02 |
-| Kd | 0,2 | 0,3 | 0,1 |
+| Kp | 0.8 | 1.2 | 0.5 |
+| Ki | 0.05 | 0.08 | 0.02 |
+| Kd | 0.02 | 0.03 | 0.01 |
 | setpoint | 650 mV | 700 mV | 600 mV |
-| minOnTime | 60 s | 30 s | 120 s |
-| minOffTime | 180 s | 120 s | 300 s |
-| deadband | 10 mV | 5 mV | 20 mV |
+| minOnTime | 30 s | 20 s | 60 s |
+| minOffTime | 120 s | 90 s | 180 s |
 
 ### Tuning-Richtlinie nach Poolgröße
 
-| Poolgröße | pH Kp | pH Ki | ORP Kp | ORP Ki | pH-Minus pro Zyklus |
-|-----------|-------|-------|--------|--------|-------------------|
-| <20 m³ | 1,5 | 0,05 | 0,8 | 0,03 | Vorsichtig dosieren |
-| 20–50 m³ | 2,0 | 0,10 | 1,0 | 0,05 | Normal |
-| 50–80 m³ | 2,5 | 0,15 | 1,2 | 0,08 | Etwas mehr |
-| >80 m³ | 3,0 | 0,20 | 1,5 | 0,10 | Höhere Durchsatzrate |
+| Poolgröße | pH Kp | pH Ki | ORP Kp | ORP Ki | Empfehlung |
+|-----------|-------|-------|--------|--------|------------|
+| <20 m³ | 1.0 | 0.05 | 0.6 | 0.03 | Vorsichtig dosieren |
+| 20–50 m³ | 1.2 | 0.08 | 0.8 | 0.05 | Normal (Standard) |
+| 50–80 m³ | 1.5 | 0.10 | 1.0 | 0.07 | Etwas mehr |
+| >80 m³ | 1.8 | 0.15 | 1.2 | 0.10 | Höhere Durchsatzrate |
 
 ### Praxis-Tipps
 
@@ -299,9 +297,7 @@ ORP-Tuning folgt dem gleichen Schema, ist aber **träger**:
 2. **Zeit geben**: ORP-Änderungen brauchen bis zu 2 Stunden. Nicht zu früh
    nachjustieren!
 3. **Wetter beachten**: Bei Hitze steigt der Chlorverbrauch → ORP sinkt.
-   Die Temperaturen erhöhen die Filterlaufzeit → mehr Umwälzung → bessere Regelung.
 4. **Cyanursäure messen**: Hohe Werte (>50 ppm) machen ORP-Regelung schwierig.
-   Abhilfe: Teilwasserwechsel oder auf nicht-stabilisiertes Chlor umsteigen.
 5. **Dokumentation**: Werte in Home Assistant tracken → Muster erkennen
 
 ---
@@ -310,93 +306,42 @@ ORP-Tuning folgt dem gleichen Schema, ist aber **träger**:
 
 ### Kritische Sicherheitsfunktionen
 
-Der Pool-Controller verfügt über mehrere, redundant ausgelegte
-Sicherheitsmechanismen:
-
 | Mechanismus | Beschreibung | Auswirkung |
 |-------------|-------------|-----------|
-| Filterpumpen-Interlock | Dosierung NUR bei laufender Filterpumpe | Verhindert Chemie-Stau |
-| Max. Einschaltdauer | Jede Pumpe hat `maxOnTimeSec` (Default 300 s) | Hardware-Timeout |
-| Min. Ausschaltzeit | `minOffTimeSec` verhindert Kurzzyklen | Schützt Dosierpumpen |
-| Extremwert-Sperre | pH < 6,5 oder pH > 8,0 → Stop | Verhindert Chemie-Unfälle |
-| Sensor-Offline | Kein Sensorwert → PID stoppt | Keine Dosierung blind |
-| Watchdog | Zeitüberschreitung → Hardware-Reset | System bleibt lauffähig |
-| MQTT-Status | `pool/status` = `alarm` bei Fehler | Benachrichtigung über HA |
+| Filterpumpen-Interlock | Chemie-Dosierung NUR bei laufender Filterpumpe (via PumpController dependents) | Verhindert Chemie-Stau |
+| Max. Tageslaufzeit | `phPump.maxDailyRuntimeMin` / `chlorinePump.maxDailyRuntimeMin` | Hardware-Schutz pro Tag |
+| Min. Ein-/Ausschaltzeit | `minOnTimeSec` / `minOffTimeSec` in PID-Params | Schützt Dosierpumpen |
+| PID-Anti-Windup | I-Anteil auf `outputMin`/`outputMax` begrenzt (Clamping) | Verhindert I-Windup |
+| Bang-Bang-Schwelle | Pumpe nur EIN wenn PID-Output > 5% | Verhindert Dauer-Takten |
+| dt-Begrenzung | Maximal 5s zwischen PID-Berechnungen | Verhindert derivative kick |
+| Sensor-Fallback | Simulation übernimmt bei Sensorausfall | Kein Stillstand |
 
 ### Filterpumpen-Interlock (Details)
 
 Die Chemie-Dosierung (pH und Chlor) ist **NUR aktiv**, wenn die Filterpumpe
-läuft. Dies ist der wichtigste Sicherheitsmechanismus:
+läuft. Dies wird über das `PumpController`-Dependent-System realisiert:
 
-```
-if (filterPumpe läuft) {
-    pH-PID darf dosieren
-    Chlor-PID darf dosieren
-} else {
-    ALLE Dosierpumpen AUS
-    PID-Regler pausiert (I-Anteil wird NICHT verändert)
-}
-```
+- `phPump` und `chlorinePump` sind als Dependents der Filterpumpe registriert
+- Wenn die Filterpumpe stoppt, werden alle Dependents per `forceOff()` gestoppt
+- Die PID-Regler laufen weiter (I-Anteil wird NICHT verändert)
 
-**Begründung:**
-- Ohne Umwälzung sammelt sich Chemie lokal → Materialschäden
-- Keine gleichmäßige Verteilung im Becken
-- Gefahr von lokalen Überkonzentrationen
+### Maximale Tageslaufzeit
 
-### Extremwert-Sperre
+Jede Dosierpumpe hat eine maximale Tageslaufzeit (`maxDailyRuntimeMin`).
+Wird dieser Wert überschritten, wird die Pumpe per `forceOff()` gestoppt
+und erst am nächsten Tag wieder freigegeben.
+
+### Anti-Windup (Clamping)
 
 ```cpp
-if (ph < 6.5 || ph > 8.0) {
-    pH-Pumpe AUS (sofort)
-    Chlor-Pumpe AUS (sofort)
-    Alarm auslösen (MQTT)
-    Warte auf manuellen Reset ODER automatische Rückkehr in 7.0–7.6
-}
+// Integral clamping an den Ausgangsgrenzen:
+_integral += _ki * error * dtSec;
+if (_integral > _outputMax) _integral = _outputMax;
+if (_integral < _outputMin) _integral = _outputMin;
 ```
 
-### Maximale Einschaltdauer
-
-Jeder Dosierpumpe ist eine maximale Einschaltdauer pro Zyklus zugewiesen
-(`maxOnTimeSec`). Wird dieser Wert überschritten, wird die Pumpe
-**zwangsweise abgeschaltet** – unabhängig von der PID-Stellgröße.
-
-Dies verhindert:
-- **Festkleben eines Relais**: Max. 5 Minuten Dosierung → Schaden minimiert
-- **Leerer Chemikalienbehälter**: Erkennbar an dauerhaftem Dosierbedarf ohne Wirkung
-- **PID-Windup**: Schutz vor aufgelaufenem I-Anteil
-
-### Visualisierung der Sicherheitslogik
-
-```
-                    ┌─────────────────────────────────┐
-                    │         PID-Berechnung           │
-                    │  Stellgröße = PID_Wert           │
-                    └──────────┬──────────────────────┘
-                               │
-                    ┌──────────▼──────────────────────┐
-                    │  Filterpumpe läuft?              │
-                    │  → NEIN → Pumpe AUS, PID pausiert│
-                    │  → JA → Weiter                   │
-                    └──────────┬──────────────────────┘
-                               │
-                    ┌──────────▼──────────────────────┐
-                    │  pH im Bereich 6.5–8.0?         │
-                    │  → NEIN → Pumpe AUS, ALARM      │
-                    │  → JA → Weiter                   │
-                    └──────────┬──────────────────────┘
-                               │
-                    ┌──────────▼──────────────────────┐
-                    │  Stellgröße > 0?                │
-                    │  → NEIN → Pumpe AUS             │
-                    │  → JA → Weiter                   │
-                    └──────────┬──────────────────────┘
-                               │
-                    ┌──────────▼──────────────────────┐
-                    │  Pumpe einschalten:              │
-                    │  - minOffTime abgelaufen?        │
-                    │  - maxOnTime nicht überschritten │
-                    └─────────────────────────────────┘
-```
+Der I-Anteil wird an `outputMin` und `outputMax` begrenzt — kein
+bedingtes Clamping, sondern hartes Clamping bei jedem Schritt.
 
 ---
 
@@ -404,75 +349,92 @@ Dies verhindert:
 
 ### PID-Werte über MQTT
 
-Der Controller sendet regelmäßig Diagnose-JSON auf:
+Der Controller sendet Diagnose-JSON auf `pool/chemistry`:
 
-```
-pool/ph/pid   → { "setpoint": 7.2, "input": 7.15, "output": 35.2, "p": 0.1, "i": 0.05, "d": 0.0 }
-pool/orp/pid  → { "setpoint": 650, "input": 620, "output": 45.0, "p": 30.0, "i": 10.0, "d": 5.0 }
+```json
+{
+  "ph": {
+    "enabled": true,
+    "setpoint": 7.2,
+    "pid_output": 35.2,
+    "pump_on": true,
+    "p": 0.24,
+    "i": 0.016,
+    "d": 0.008
+  },
+  "chlorine": {
+    "enabled": true,
+    "setpoint": 650,
+    "pid_output": 45.0,
+    "pump_on": false,
+    "p": 40.0,
+    "i": 15.0,
+    "d": 2.5
+  }
+}
 ```
 
 | Feld | Beschreibung |
 |------|-------------|
+| `enabled` | Regelkreis aktiv? |
 | `setpoint` | Aktueller Sollwert |
-| `input` | Aktueller Istwert (letzte Messung) |
-| `output` | Stellgröße (0–100 %) |
+| `pid_output` | PID-Stellgröße (0–100 %) |
+| `pump_on` | Dosierpumpe aktuell EIN? |
 | `p` | P-Anteil (aktuell) |
 | `i` | I-Anteil (aktuell) |
 | `d` | D-Anteil (aktuell) |
 
 ### Pumpen-Statistiken
 
-```
-pool/ph/pump/stats → { "runtime_today": 340, "cycles_today": 5, "last_on": "2024-06-15T14:30:22" }
-```
+Pumpen-Laufzeiten werden auf `pool/pumps` publiziert:
 
-| Feld | Beschreibung |
-|------|-------------|
-| `runtime_today` | Laufzeit heute (Sekunden) |
-| `cycles_today` | Anzahl Einschaltzyklen heute |
-| `last_on` | Letzter Einschaltzeitpunkt (ISO 8601) |
-| `last_off` | Letzter Ausschaltzeitpunkt (ISO 8601) |
+```json
+{
+  "ph_pump": {
+    "name": "pH Pump",
+    "on": false,
+    "runtime_today_min": 12.5,
+    "runtime_minutes": 345,
+    "last_on_duration": 45
+  },
+  "chlorine_pump": { ... },
+  "filter_pump": { ... }
+}
+```
 
 ### Debug-Logging
 
-Bei `logLevel: 3` (DEBUG) werden detaillierte PID-Diagnosedaten auf der
-seriellen Schnittstelle ausgegeben:
+Bei `logLevel: 1` werden PID-Statusmeldungen ausgegeben:
 
 ```
-[D] pH-PID: sp=7.20, in=7.15, err=0.05, P=0.10, I=0.05, D=0.00, out=35.2%
-[D] pH-PID: out=35.2% → 300s Zyklus → ON 105.6s (minOn=30s ✅, minOff=120s ✅)
-[D] pH-Pumpe: EIN (Kanal 1, GPIO 15)
-[D] pH-Pumpe: Timer gestartet: 105s verbleibend
-
-[D] Chlor-PID: sp=650, in=620, err=30, P=30.0, I=10.0, D=5.0, out=45.0%
-[D] Chlor-PID: out=45.0% → 300s Zyklus → ON 135.0s (minOn=60s ✅, minOff=180s ✅)
-[D] Chlor-Pumpe: EIN (Kanal 2, GPIO 14)
+[I] Pool chemistry controller initialized
+[I]   pH PID: Kp=1.20 Ki=0.0800 Kd=0.0400 setpoint=7.2 reverse=true
+[I]   Cl PID: Kp=0.80 Ki=0.0500 Kd=0.0200 setpoint=650 mV reverse=false
+[I] pH pump ON (output=35.2%, pH=7.35, setpoint=7.20)
+[I] pH pump OFF (output=2.1%, pH=7.21)
+[I] Chlorine pump ON (output=45.0%, ORP=620, setpoint=650)
 ```
 
 ### Grafische Auswertung (Home Assistant)
 
-In Home Assistant können die PID-Verläufe wunderbar visualisiert werden:
+In Home Assistant können die PID-Verläufe visualisiert werden:
 
 ```yaml
-# Beispiel: pH-Verlauf als Liniendiagramm
+# pH-Verlauf
 type: history-graph
 title: pH-Regelung
 entities:
   - entity: sensor.pool_ph
-    name: pH-Istwert
   - entity: number.pool_ph_setpoint
-    name: pH-Sollwert
+  - entity: sensor.pool_ph_pid_output
 
----
-
-# Beispiel: ORP-Verlauf
+# ORP-Verlauf
 type: history-graph
 title: Chlor-Regelung (ORP)
 entities:
   - entity: sensor.pool_orp
-    name: ORP-Istwert
   - entity: number.pool_orp_setpoint
-    name: ORP-Sollwert
+  - entity: sensor.pool_chlorine_pid_output
 ```
 
 ---
@@ -484,11 +446,11 @@ entities:
 | Problem | Ursache | Lösung |
 |---------|---------|--------|
 | pH steigt trotz Dosierung | Filterpumpe läuft nicht | Interlock prüfen |
-| pH sinkt nicht | Säure leer | Behälter füllen |
+| pH sinkt nicht | Säure leer / Tageslimit erreicht | Behälter füllen, `maxDailyRuntimeMin` prüfen |
 | ORP fällt trotz Dosierung | Cyanursäure zu hoch | Teilwasserwechsel |
 | ORP schwankt stark | pH-Regelung instabil | Zuerst pH tunen! |
 | Pumpe taktet zu schnell | minOffTime zu niedrig | Erhöhen |
-| Pumpe läuft dauerhaft | maxOnTime zu hoch / I-Windup | maxOnTime prüfen |
+| Pumpe läuft nicht | PID-Output < 5% / minOffTime nicht abgelaufen | Parameter prüfen |
 | Keine Reaktion auf PID-Änderung | PID-Werte zu niedrig | Kp/Ki schrittweise erhöhen |
 
 ### Typische PID-Fehlersymptome
@@ -496,32 +458,31 @@ entities:
 **Oszillation (Schwingung)**: Der Istwert pendelt um den Sollwert.
 - → Kp zu hoch → reduzieren
 - → Ki zu hoch → reduzieren
-- → Deadband zu niedrig → erhöhen
 
 **Bleibende Regelabweichung**: Der Istwert erreicht den Sollwert nicht.
 - → Ki zu niedrig → erhöhen
-- → I-Anteil durch minOffTime blockiert → prüfen
+- → Bang-Bang-Schwelle (5%) zu hoch → Toleranz prüfen
 
 **Träge Reaktion**: Der Istwert ändert sich kaum.
 - → Kp zu niedrig → erhöhen
 - → Ki zu niedrig → erhöhen
-- → Sensor-UpdateIntervall zu lang → verkürzen
 
 **Dauerlauf**: Die Pumpe läuft ununterbrochen.
-- → Sensor offline? → prüfen
-- → maxOnTime zu niedrig? → erhöhen
-- → I-Windup (nach langer Pause) → Anti-Windup prüfen
+- → Sensor offline? → Simulations-Fallback prüfen
+- → Tageslimit nicht gesetzt? → `maxDailyRuntimeMin` konfigurieren
+- → I-Windup → Anti-Windup-Clamping prüfen
 
 ### Checkliste bei Inbetriebnahme
 
-- [ ] pH-Sensor kalibriert? (pH 4.0 + 7.0)
-- [ ] ORP-Sensor kalibriert? (Pufferlösung)
+- [ ] pH-Sensor kalibriert? (pH 4.0 + 7.0 via `setCalibration()`)
+- [ ] ORP-Sensor geprüft?
 - [ ] Filterpumpe läuft? (ohne Interlock keine Dosierung!)
-- [ ] config.json auf ESP32 hochgeladen?
+- [ ] `config.json` auf ESP32 hochgeladen (LittleFS)?
 - [ ] MQTT-Verbindung steht?
 - [ ] PID-Setpoints sinnvoll? (pH 7.2, ORP 650)
-- [ ] minOnTime/minOffTime plausibel?
-- [ ] maxOnTime (Sicherheit) gesetzt?
+- [ ] `reverseAction` korrekt? (pH: true, Chlor: false)
+- [ ] `minOnTimeSec`/`minOffTimeSec` plausibel?
+- [ ] `maxDailyRuntimeMin` (Sicherheit) gesetzt?
 - [ ] Home Assistant: Werden Werte empfangen?
 
 > **Empfehlung:** Nach der ersten Inbetriebnahme den Controller
