@@ -40,10 +40,8 @@ void SensorSimulator::reset(unsigned long baseTime) {
 }
 
 float SensorSimulator::randomWalkStep() {
-    // Use deterministic pseudo-random based on seed
-    _seed = _seed * 1103515245 + 12345;
-    float r = (float)(_seed & 0x7FFFFFFF) / (float)0x7FFFFFFF;  // 0..1
-    return (r - 0.5f) * 2.0f;  // -1..1
+    // Unused — kept for API compatibility
+    return 0.0f;
 }
 
 void SensorSimulator::update() {
@@ -59,21 +57,6 @@ void SensorSimulator::update() {
 
     // Calculate drift for this time step
     float deltaHours = deltaMs / 3600000.0f;
-    float maxStep = _driftPerHour * deltaHours;
-
-    // Oscillate target around center with slow sine wave
-    float center = (_minVal + _maxVal) / 2.0f;
-    float range = (_maxVal - _minVal) / 2.0f;
-    float phase = (now % 7200000) / 7200000.0f * 2.0f * M_PI;  // 2 hour cycle
-    _target = center + sinf(phase) * range * 0.3f;  // target moves ±30% of range
-
-    // Random walk towards target
-    float diff = _target - _currentValue;
-    float pullStrength = min(0.1f, deltaHours * 2.0f);  // gradual pull
-    float pull = diff * pullStrength;
-    float noise = randomWalkStep() * maxStep * 0.3f;
-
-    _currentValue += pull + noise;
 
     // Apply pump-aware directional drift (pump chemistry effect)
     if (_pumpActive) {
