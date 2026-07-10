@@ -175,7 +175,7 @@ void MQTTManager::publishDiscovery() {
 
     // Pool pH — dedicated raw-numeric topic (no JSON parsing)
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph").c_str());
-    payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\",\"state_class\":\"measurement\","
+    payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"state_class\":\"measurement\","
               "\"state_topic\":\"" + _baseTopic + "/ph\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_ph\"}";
     _client.publish(topicBuf, payload.c_str(), true);
