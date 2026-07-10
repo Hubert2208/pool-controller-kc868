@@ -130,7 +130,7 @@ bool SensorManager::begin() {
     if (_phSim) _phSim->setPumpDriftRates(0.15f, -0.8f);
     // ORP: natural decay (-8 mV/h) -- chlorine degrades without dosing
     //      pump ON raises ORP (+40 mV/h) -- chlorine dosing effect
-    if (_orpSim) _orpSim->setPumpDriftRates(8.0f, -40.0f);
+    if (_orpSim) _orpSim->setPumpDriftRates(-8.0f, 40.0f);
 
     log_i("Sensor manager initialized with %d real sensors + simulation fallbacks", _sensorCount);
     return true;
