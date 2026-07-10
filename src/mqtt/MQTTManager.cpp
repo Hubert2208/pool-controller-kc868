@@ -175,7 +175,7 @@ void MQTTManager::publishDiscovery() {
 
     // Pool pH — dedicated raw-numeric topic (no JSON parsing)
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph").c_str());
-    payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"unit_of_measurement\":\"pH\","
+    payload = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"state_class\":\"measurement\","
               "\"state_topic\":\"" + _baseTopic + "/ph\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_ph\"}";
     _client.publish(topicBuf, payload.c_str(), true);
@@ -213,13 +213,6 @@ void MQTTManager::publishDiscovery() {
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
               "\"value_template\":\"{{ value_json.filter_pressure.value }}\","
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fp\"}";
-    _client.publish(topicBuf, payload.c_str(), true);
-
-    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("binary_sensor", "needs_backwash").c_str());
-    payload = "{\"device_class\":\"problem\",\"name\":\"Needs Backwash\","
-              "\"state_topic\":\"" + _baseTopic + "/sensors\","
-              "\"value_template\":\"{{ value_json.filter_pressure.needs_backwash }}\","
-              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_bw\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
     // ── Chemistry entities on pool-controller/chemistry ──
@@ -315,7 +308,7 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     _discoveryPublished = true;
-    log_i("HA discovery published (16 entities)");
+    log_i("HA discovery published (15 entities)");
 }
 
 void MQTTManager::mqttCallback(char* topic, byte* payload, unsigned int length) {
