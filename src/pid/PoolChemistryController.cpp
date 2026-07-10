@@ -173,7 +173,7 @@ String PoolChemistryController::getStateJSON() {
     JsonObject ph = doc.createNestedObject("ph");
     ph["enabled"] = _phEnabled;
     ph["setpoint"] = _phPID.getSetpoint();
-    ph["pid_output"] = round(_lastPHOutput * 10.0f) / 10.0f;
+    ph["pid_output"] = round(_lastPHOutput * 100.0f) / 100.0f;
     ph["pump_on"] = _phPump.isOn();
     ph["p"] = _phPID.getP();
     ph["i"] = _phPID.getI();
@@ -182,7 +182,7 @@ String PoolChemistryController::getStateJSON() {
     JsonObject cl = doc.createNestedObject("chlorine");
     cl["enabled"] = _chlorineEnabled;
     cl["setpoint"] = _chlorinePID.getSetpoint();
-    cl["pid_output"] = round(_lastChlorineOutput * 10.0f) / 10.0f;
+    cl["pid_output"] = round(_lastChlorineOutput * 100.0f) / 100.0f;
     cl["pump_on"] = _chlorinePump.isOn();
     cl["p"] = _chlorinePID.getP();
     cl["i"] = _chlorinePID.getI();
