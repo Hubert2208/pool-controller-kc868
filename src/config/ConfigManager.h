@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 4  // added reverseAction to PIDParams
+#define CONFIG_VERSION 5  // added maxDailyRuntimeMin to FilterPumpConfig + PumpController enforcement
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -85,7 +85,7 @@ struct PumpConfig {
     int relayChannel = 0;
     int minOnTimeSec = 30;
     int minOffTimeSec = 120;
-    float maxDailyRuntimeMin = 1440.0;
+    float maxDailyRuntimeMin = 1440.0;  // 24h default = unlimited
 
     String toJson() const;
     static PumpConfig fromJson(JsonVariantConst json);
@@ -99,6 +99,7 @@ struct FilterPumpConfig {
     String windowEnd = "21:00";
     int minCycleMinutes = 60;
     int maxCycleMinutes = 480;
+    float maxDailyRuntimeMin = 1440.0;  // 24h default = unlimited
 
     String toJson() const;
     static FilterPumpConfig fromJson(JsonVariantConst json);

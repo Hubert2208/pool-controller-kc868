@@ -79,24 +79,27 @@
     "simDriftPerHour": 0.1
   },
   "phPump": {
+    "_comment": "minOn/Off verhindern Takten, maxDailyRuntimeMin begrenzt Überdosierung",
     "relayChannel": 1,
     "minOnTimeSec": 30,
     "minOffTimeSec": 120,
-    "maxDailyRuntimeMin": 1440.0
+    "maxDailyRuntimeMin": 120
   },
   "chlorinePump": {
+    "_comment": "minOn/Off verhindern Takten, maxDailyRuntimeMin begrenzt Überdosierung",
     "relayChannel": 2,
     "minOnTimeSec": 30,
     "minOffTimeSec": 120,
-    "maxDailyRuntimeMin": 1440.0
+    "maxDailyRuntimeMin": 240
   },
   "filterPump": {
-    "_comment": "Filterlaufzeit-Formel: waterTemp/2*60 Minuten (Branchenstandard). z.B. 20°C→600min, 30°C→900min.",
+    "_comment": "Filterlaufzeit: waterTemp/2*60 Minuten. min/maxCycleMinutes = Taktung, maxDailyRuntimeMin = Tageslimit",
     "relayChannel": 0,
     "windowStart": "07:00",
     "windowEnd": "21:00",
     "minCycleMinutes": 60,
-    "maxCycleMinutes": 480
+    "maxCycleMinutes": 480,
+    "maxDailyRuntimeMin": 720
   },
   "relays": [
     {"channel": 0, "name": "Filter Pumpe", "normallyOpen": true, "maxOnTimeSec": 0},
@@ -109,7 +112,7 @@
     {"channel": 7, "name": "Relay 8", "normallyOpen": true, "maxOnTimeSec": 0}
   ],
   "relayCount": 8,
-  "configVersion": 4,
+  "configVersion": 5,
   "logLevel": 1,
   "loopDelayMs": 100
 }

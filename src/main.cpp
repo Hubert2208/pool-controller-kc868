@@ -231,14 +231,32 @@ void setup() {
     Wire.begin(4, 5); relayManager.begin(); relayManager.allOff();
     sensorManager = new SensorManager(configManager); sensorManager->begin();
     AppConfig& cfg = configManager.get();
-    phPumpCtrl = new PumpController(relayManager, cfg.phPump.relayChannel, "pH Pump"); phPumpCtrl->begin();
-    chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump"); chlorinePumpCtrl->begin();
-    phPumpCtrl->setMinOnTime(cfg.phPID.minOnTimeSec * 1000); phPumpCtrl->setMinOffTime(cfg.phPID.minOffTimeSec * 1000);
-    chlorinePumpCtrl->setMinOnTime(cfg.chlorinePID.minOnTimeSec * 1000); chlorinePumpCtrl->setMinOffTime(cfg.chlorinePID.minOffTimeSec * 1000);
-    filterPumpCtrl = new PumpController(relayManager, cfg.filterPump.relayChannel, "Filter Pump"); filterPumpCtrl->begin();
-    filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl); filterPumpLogic->begin();
-    filterPumpCtrl->addDependent(phPumpCtrl); filterPumpCtrl->addDependent(chlorinePumpCtrl);
-    chemistryController = new PoolChemistryController(configManager, *sensorManager, *phPumpCtrl, *chlorinePumpCtrl); chemistryController->begin();
+
+    // pH Pump: min on/off times from PID config, max daily from PumpConfig
+    phPumpCtrl = new PumpController(relayManager, cfg.phPump.relayChannel, "pH Pump");
+    phPumpCtrl->begin();
+    phPumpCtrl->setMinOnTime(cfg.phPID.minOnTimeSec * 1000);
+    phPumpCtrl->setMinOffTime(cfg.phPID.minOffTimeSec * 1000);
+    phPumpCtrl->setMaxDailyRuntime((unsigned long)(cfg.phPump.maxDailyRuntimeMin * 60000));
+
+    // Chlorine Pump: min on/off times from PID config, max daily from PumpConfig
+    chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump");
+    chlorinePumpCtrl->begin();
+    chlorinePumpCtrl->setMinOnTime(cfg.chlorinePID.minOnTimeSec * 1000);
+    chlorinePumpCtrl->setMinOffTime(cfg.chlorinePID.minOffTimeSec * 1000);
+    chlorinePumpCtrl->setMaxDailyRuntime((unsigned long)(cfg.chlorinePump.maxDailyRuntimeMin * 60000));
+
+    // Filter Pump: managed by FilterPumpLogic (minCycleMinutes/maxCycleMinutes from config)
+    filterPumpCtrl = new PumpController(relayManager, cfg.filterPump.relayChannel, "Filter Pump");
+    filterPumpCtrl->begin();
+    filterPumpCtrl->setMaxDailyRuntime((unsigned long)(cfg.filterPump.maxDailyRuntimeMin * 60000));
+    filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl);
+    filterPumpLogic->begin();
+    filterPumpCtrl->addDependent(phPumpCtrl);
+    filterPumpCtrl->addDependent(chlorinePumpCtrl);
+
+    chemistryController = new PoolChemistryController(configManager, *sensorManager, *phPumpCtrl, *chlorinePumpCtrl);
+    chemistryController->begin();
     setupWiFi(); setupWebServer();
 
     if (wifiConnected) {

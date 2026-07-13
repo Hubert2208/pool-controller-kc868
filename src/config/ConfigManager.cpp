@@ -146,6 +146,7 @@ String FilterPumpConfig::toJson() const {
     doc["windowEnd"] = windowEnd;
     doc["minCycleMinutes"] = minCycleMinutes;
     doc["maxCycleMinutes"] = maxCycleMinutes;
+    doc["maxDailyRuntimeMin"] = maxDailyRuntimeMin;
     String out;
     serializeJson(doc, out);
     return out;
@@ -161,6 +162,7 @@ FilterPumpConfig FilterPumpConfig::fromJson(JsonVariantConst json) {
         if (json["windowEnd"].is<const char*>()) f.windowEnd = json["windowEnd"].as<const char*>();
         f.minCycleMinutes = json["minCycleMinutes"] | f.minCycleMinutes;
         f.maxCycleMinutes = json["maxCycleMinutes"] | f.maxCycleMinutes;
+        f.maxDailyRuntimeMin = json["maxDailyRuntimeMin"] | f.maxDailyRuntimeMin;
     }
     return f;
 }
@@ -290,6 +292,7 @@ String AppConfig::toJson() const {
     fp["windowEnd"] = filterPump.windowEnd;
     fp["minCycleMinutes"] = filterPump.minCycleMinutes;
     fp["maxCycleMinutes"] = filterPump.maxCycleMinutes;
+    fp["maxDailyRuntimeMin"] = filterPump.maxDailyRuntimeMin;
 
     JsonArray relaysArr = doc.createNestedArray("relays");
     for (int i = 0; i < relayCount; i++) {
@@ -507,6 +510,7 @@ bool ConfigManager::updateFromJson(const String& json) {
         if (o["windowEnd"].is<const char*>()) current.filterPump.windowEnd = o["windowEnd"].as<const char*>();
         if (o["minCycleMinutes"].is<int>()) current.filterPump.minCycleMinutes = o["minCycleMinutes"];
         if (o["maxCycleMinutes"].is<int>()) current.filterPump.maxCycleMinutes = o["maxCycleMinutes"];
+        if (o["maxDailyRuntimeMin"].is<float>()) current.filterPump.maxDailyRuntimeMin = o["maxDailyRuntimeMin"];
     }
 
     if (doc["relayCount"].is<int>()) current.relayCount = doc["relayCount"];

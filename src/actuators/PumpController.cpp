@@ -7,6 +7,7 @@ PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel,
     , _relayChannel(relayChannel)
     , _minOnTimeMs(30000)
     , _minOffTimeMs(120000)
+    , _maxDailyRuntimeMs(0)
     , _lastOnTime(0)
     , _lastOffTime(0)
     , _cycleStartTime(0)
@@ -38,6 +39,13 @@ bool PumpController::turnOn() {
     // Interlock: this pump requires master to be running
     if (_master && !_master->isOn()) {
         log_w("Pump '%s' interlock blocked: '%s' not running", _name, _master->getName());
+        return false;
+    }
+
+    // Guard: check daily max runtime
+    if (isMaxDailyReached()) {
+        log_w("Pump '%s' daily max runtime reached (%lu/%lu ms)",
+              _name, getRuntimeToday(), _maxDailyRuntimeMs);
         return false;
     }
 
@@ -140,6 +148,20 @@ void PumpController::setMinOnTime(unsigned long ms) {
 
 void PumpController::setMinOffTime(unsigned long ms) {
     _minOffTimeMs = ms;
+}
+
+void PumpController::setMaxDailyRuntime(unsigned long ms) {
+    _maxDailyRuntimeMs = ms;
+}
+
+unsigned long PumpController::getMaxDailyRuntime() const {
+    return _maxDailyRuntimeMs;
+}
+
+bool PumpController::isMaxDailyReached() const {
+    updateDailyReset();
+    if (_maxDailyRuntimeMs == 0) return false;  // 0 = unlimited
+    return getRuntimeToday() >= _maxDailyRuntimeMs;
 }
 
 void PumpController::addDependent(PumpController* dep) {

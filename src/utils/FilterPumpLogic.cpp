@@ -43,9 +43,10 @@ float FilterPumpLogic::calculateDailyRuntime(float waterTemp) const {
     // Quelle: Branchenstandard für private Pools (Temperatur-abhängige Filterlaufzeit)
     float runtime = (waterTemp / 2.0f) * 60.0f;
 
-    // Clamp to reasonable range
-    if (runtime < 60.0f) runtime = 60.0f;      // minimum 1 hour
-    if (runtime > 1440.0f) runtime = 1440.0f;  // maximum 24 hours
+    // Clamp: minimum 1 hour, maximum from config (default 24h)
+    FilterPumpConfig& cfg = _config.get().filterPump;
+    if (runtime < 60.0f) runtime = 60.0f;
+    if (runtime > cfg.maxDailyRuntimeMin) runtime = cfg.maxDailyRuntimeMin;
 
     return runtime;
 }
@@ -75,6 +76,8 @@ int FilterPumpLogic::getRequiredCyclesPerDay() const {
 }
 
 void FilterPumpLogic::manageCycles() {
+    FilterPumpConfig& cfg = _config.get().filterPump;
+
     if (!isInOperatingWindow()) {
         if (_pump.isOn()) {
             log_i("Filter pump OFF (outside operating window)");
@@ -86,8 +89,20 @@ void FilterPumpLogic::manageCycles() {
 
     if (_dailyRequiredMinutes <= 0) return;
 
+    // Guard: enforce configurable daily max runtime
+    unsigned long todayMinutes = _pump.getRuntimeMinutes();
+    unsigned long maxMinutes = (unsigned long)cfg.maxDailyRuntimeMin;
+    if (todayMinutes >= maxMinutes) {
+        if (_pump.isOn()) {
+            log_i("Filter pump OFF (daily max %.0f min reached, today %lu min)",
+                  cfg.maxDailyRuntimeMin, todayMinutes);
+            _pump.forceOff();
+        }
+        return;
+    }
+
     unsigned long now = millis();
-    unsigned long currentRuntime = _pump.getRuntimeMinutes() * 60000;  // in ms
+    unsigned long currentRuntime = todayMinutes * 60000;  // in ms
     unsigned long targetRuntime = (unsigned long)(_dailyRequiredMinutes * 60000);
 
     // If we've already met today's target, turn off
@@ -101,7 +116,6 @@ void FilterPumpLogic::manageCycles() {
 
     // Calculate remaining runtime needed
     unsigned long remainingMs = targetRuntime - currentRuntime;
-    FilterPumpConfig& cfg = _config.get().filterPump;
 
     // Determine cycle duration
     unsigned long cycleDurationMs = (unsigned long)(cfg.maxCycleMinutes * 60000);
@@ -123,8 +137,6 @@ void FilterPumpLogic::manageCycles() {
         }
     } else {
         // Check if current cycle has run long enough
-        unsigned long cycleDuration = now - _pump.getLastOnDuration();
-        // Actually getCycleStartTime isn't exposed, so use simpler check:
         unsigned long onDuration = (_pump.getLastOnDuration() > 0)
             ? _pump.getLastOnDuration() : 0;
 
@@ -151,11 +163,13 @@ void FilterPumpLogic::setEnabled(bool enabled) {
 }
 
 String FilterPumpLogic::getStateJSON() const {
+    FilterPumpConfig& cfg = _config.get().filterPump;
     StaticJsonDocument<256> doc;
     doc["enabled"] = _enabled;
     doc["required_runtime_min"] = _dailyRequiredMinutes;
     doc["pump_on"] = _pump.isOn();
     doc["runtime_today_min"] = _pump.getRuntimeMinutes();
+    doc["max_daily_min"] = cfg.maxDailyRuntimeMin;
     doc["in_window"] = isInOperatingWindow();
     doc["cycles_per_day"] = getRequiredCyclesPerDay();
     String out;

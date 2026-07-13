@@ -24,6 +24,9 @@ public:
 
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
+    void setMaxDailyRuntime(unsigned long ms);  // 0 = unlimited
+    unsigned long getMaxDailyRuntime() const;
+    bool isMaxDailyReached() const;
     void resetDailyRuntime() const;
 
     // Dependents: pumps that may only run when this pump is running.
@@ -43,6 +46,7 @@ private:
 
     unsigned long _minOnTimeMs;
     unsigned long _minOffTimeMs;
+    unsigned long _maxDailyRuntimeMs;  // 0 = unlimited
     unsigned long _lastOnTime;
     unsigned long _lastOffTime;
     unsigned long _cycleStartTime;
