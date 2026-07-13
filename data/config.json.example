@@ -91,9 +91,8 @@
     "maxDailyRuntimeMin": 1440.0
   },
   "filterPump": {
+    "_comment": "Filterlaufzeit-Formel: waterTemp/2*60 Minuten (Branchenstandard). z.B. 20°C→600min, 30°C→900min.",
     "relayChannel": 0,
-    "tempSlope": -7.5,
-    "tempIntercept": 300.0,
     "windowStart": "07:00",
     "windowEnd": "21:00",
     "minCycleMinutes": 60,
