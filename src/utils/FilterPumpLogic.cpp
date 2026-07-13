@@ -38,10 +38,9 @@ void FilterPumpLogic::update(float waterTemperature) {
 }
 
 float FilterPumpLogic::calculateDailyRuntime(float waterTemp) const {
-    FilterPumpConfig& cfg = _config.get().filterPump;
-
-    // Simple rule: waterTemp / 2 = hours → convert to minutes
-    // e.g. 20°C → 10h→600min, 26°C → 13h→780min, 30°C → 15h→900min
+    // Praxis-übliche Faustformel: Wassertemperatur / 2 = Stunden → ×60 = Minuten
+    // z.B. 20°C → 10h → 600min, 26°C → 13h → 780min, 30°C → 15h → 900min
+    // Quelle: Branchenstandard für private Pools (Temperatur-abhängige Filterlaufzeit)
     float runtime = (waterTemp / 2.0f) * 60.0f;
 
     // Clamp to reasonable range

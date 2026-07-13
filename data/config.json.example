@@ -1,0 +1,115 @@
+{
+  "wifi": {
+    "ssid": "",
+    "password": "",
+    "hostname": "pool-controller",
+    "fallbackAP": true,
+    "apSSID": "PoolController-AP",
+    "apPassword": "12345678"
+  },
+  "mqtt": {
+    "broker": "",
+    "port": 1883,
+    "clientId": "pool-controller",
+    "username": "",
+    "password": "",
+    "baseTopic": "pool",
+    "keepAliveSec": 60
+  },
+  "phPID": {
+    "kp": 1.2,
+    "ki": 0.08,
+    "kd": 0.04,
+    "setpoint": 7.2,
+    "outputMin": 0.0,
+    "outputMax": 100.0,
+    "minOnTimeSec": 15,
+    "minOffTimeSec": 60,
+    "reverseAction": true
+  },
+  "chlorinePID": {
+    "kp": 0.8,
+    "ki": 0.05,
+    "kd": 0.02,
+    "setpoint": 650.0,
+    "outputMin": 0.0,
+    "outputMax": 100.0,
+    "minOnTimeSec": 30,
+    "minOffTimeSec": 120,
+    "reverseAction": false
+  },
+  "phSensor": {
+    "enabled": true,
+    "simulate": true,
+    "updateIntervalMs": 2000,
+    "simMin": 6.8,
+    "simMax": 7.6,
+    "simDriftPerHour": 0.05
+  },
+  "orpSensor": {
+    "enabled": true,
+    "simulate": true,
+    "updateIntervalMs": 2000,
+    "simMin": 200.0,
+    "simMax": 800.0,
+    "simDriftPerHour": 10.0
+  },
+  "tempAirSensor": {
+    "enabled": true,
+    "simulate": true,
+    "updateIntervalMs": 5000,
+    "simMin": 10.0,
+    "simMax": 40.0,
+    "simDriftPerHour": 2.0
+  },
+  "tempWaterSensor": {
+    "enabled": true,
+    "simulate": true,
+    "updateIntervalMs": 5000,
+    "simMin": 5.0,
+    "simMax": 35.0,
+    "simDriftPerHour": 0.5
+  },
+  "pressureSensor": {
+    "enabled": true,
+    "simulate": true,
+    "updateIntervalMs": 5000,
+    "simMin": 0.0,
+    "simMax": 2.5,
+    "simDriftPerHour": 0.1
+  },
+  "phPump": {
+    "relayChannel": 1,
+    "minOnTimeSec": 30,
+    "minOffTimeSec": 120,
+    "maxDailyRuntimeMin": 1440.0
+  },
+  "chlorinePump": {
+    "relayChannel": 2,
+    "minOnTimeSec": 30,
+    "minOffTimeSec": 120,
+    "maxDailyRuntimeMin": 1440.0
+  },
+  "filterPump": {
+    "_comment": "Filterlaufzeit-Formel: waterTemp/2*60 Minuten (Branchenstandard). z.B. 20°C→600min, 30°C→900min.",
+    "relayChannel": 0,
+    "windowStart": "07:00",
+    "windowEnd": "21:00",
+    "minCycleMinutes": 60,
+    "maxCycleMinutes": 480
+  },
+  "relays": [
+    {"channel": 0, "name": "Filter Pumpe", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 1, "name": "pH Pumpe", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 2, "name": "Chlor Pumpe", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 3, "name": "Relay 4", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 4, "name": "Relay 5", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 5, "name": "Relay 6", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 6, "name": "Relay 7", "normallyOpen": true, "maxOnTimeSec": 0},
+    {"channel": 7, "name": "Relay 8", "normallyOpen": true, "maxOnTimeSec": 0}
+  ],
+  "relayCount": 8,
+  "configVersion": 4,
+  "logLevel": 1,
+  "loopDelayMs": 100
+}

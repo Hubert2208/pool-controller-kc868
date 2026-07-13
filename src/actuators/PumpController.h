@@ -48,6 +48,7 @@ private:
     unsigned long _cycleStartTime;
     mutable unsigned long _dailyRuntimeMs;
     mutable unsigned long _lastDailyReset;
+    mutable int _lastResetDay;  // tm_yday of last daily reset (NTP mode)
 
     bool _initialized;
 
