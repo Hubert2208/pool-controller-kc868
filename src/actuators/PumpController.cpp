@@ -12,6 +12,7 @@ PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel,
     , _cycleStartTime(0)
     , _dailyRuntimeMs(0)
     , _lastDailyReset(0)
+    , _lastResetDay(-1)
     , _initialized(false)
     , _master(nullptr)
     , _dependentCount(0)
@@ -172,17 +173,14 @@ void PumpController::resetDailyRuntime() const {
 }
 
 void PumpController::updateDailyReset() const {
-    // Use NTP time for true midnight reset, fallback to millis uptime
     time_t t = time(nullptr);
     if (t > 100000) {
-        // NTP synced: check if date changed
+        // NTP synced: use calendar day to detect midnight crossing
         struct tm* ti = localtime(&t);
-        int todaySecs = ti->tm_hour * 3600 + ti->tm_min * 60 + ti->tm_sec;
-        time_t todayMidnight = t - todaySecs;
-
-        // Reset if last daily reset was before today's midnight (in ms)
-        if ((unsigned long long)_lastDailyReset < (unsigned long long)todayMidnight * 1000ULL) {
+        if (_lastResetDay < 0) _lastResetDay = ti->tm_yday;
+        if (ti->tm_yday != _lastResetDay) {
             resetDailyRuntime();
+            _lastResetDay = ti->tm_yday;
         }
     } else {
         // No NTP: reset every 24h of uptime

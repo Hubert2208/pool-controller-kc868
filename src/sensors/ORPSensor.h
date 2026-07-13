@@ -17,7 +17,7 @@ public:
     const char* getUnit() const override { return "mV"; }
     bool isConnected() const override { return _connected; }
 
-    void setCalibration(float refVoltage);
+    void setCalibration(float knownORP_mV);
     float getCalibrationOffset() const { return _calOffset; }
 
 private:

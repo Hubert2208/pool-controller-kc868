@@ -61,10 +61,11 @@ bool ORPSensor::read() {
     return true;
 }
 
-void ORPSensor::setCalibration(float refVoltage) {
-    // Calculate offset: if we read V_now and reference solution is known mV
-    // offset = knownORP - (V_now / 4.096 * 1000)
-    float measured_mV = (refVoltage / ADS1115_MAX_VOLTAGE) * 1000.0f;
-    _calOffset = refVoltage - measured_mV;  // refVoltage is the known ORP in mV
-    log_i("ORP cal updated: offset=%.1f mV", _calOffset);
+void ORPSensor::setCalibration(float knownORP_mV) {
+    // Read actual probe voltage and compute offset against known ORP value
+    float currentVoltage = readVoltage();
+    float measured_mV = (currentVoltage / ADS1115_MAX_VOLTAGE) * 1000.0f;
+    _calOffset = knownORP_mV - measured_mV;
+    log_i("ORP cal: known=%.1f mV, measured=%.1f mV, offset=%.1f mV",
+          knownORP_mV, measured_mV, _calOffset);
 }

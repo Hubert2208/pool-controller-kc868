@@ -40,9 +40,9 @@ void FilterPumpLogic::update(float waterTemperature) {
 float FilterPumpLogic::calculateDailyRuntime(float waterTemp) const {
     FilterPumpConfig& cfg = _config.get().filterPump;
 
-    // Simple rule: waterTemp / 2 = hours → convert to minutes
-    // e.g. 20°C → 10h→600min, 26°C → 13h→780min, 30°C → 15h→900min
-    float runtime = (waterTemp / 2.0f) * 60.0f;
+    // Use configurable slope/intercept formula
+    // e.g. tempSlope=8.0, tempIntercept=-40 → 8.0×25−40 = 160 min at 25°C
+    float runtime = cfg.tempSlope * waterTemp + cfg.tempIntercept;
 
     // Clamp to reasonable range
     if (runtime < 60.0f) runtime = 60.0f;      // minimum 1 hour
