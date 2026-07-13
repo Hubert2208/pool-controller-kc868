@@ -60,6 +60,15 @@ String relayButton(int channel, bool state) {
     return "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
 }
 
+String pumpConfigSlider(const char* pumpId, const char* key, const char* label, float value, float minV, float maxV, float step, const char* unit) {
+    String id = String(pumpId) + "-" + String(key);
+    String out = "<div class='sp-row'><span class='sp-label'>" + String(label) + ":</span>";
+    out += "<input type='range' class='sp-range' id='" + id + "' min='" + String(minV) + "' max='" + String(maxV) + "' step='" + String(step) + "' value='" + String(value) + "'";
+    out += " oninput=\"document.getElementById('" + id + "-val').textContent=this.value\">";
+    out += "<span class='sp-val' id='" + id + "-val'>" + String(value) + "</span> " + String(unit) + "</div>";
+    return out;
+}
+
 void handleRoot() {
     AppConfig& cfg = configManager.get();
     String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
@@ -67,6 +76,7 @@ void handleRoot() {
     html += "<style>";
     html += "body{font-family:Arial,sans-serif;margin:10px;background:#1a1a2e;color:#eee}";
     html += "h1{color:#0f0;font-size:1.3em;margin:8px 0}h2{color:#0af;font-size:1em;margin:6px 0}";
+    html += "h3{color:#0af;font-size:0.85em;margin:4px 0}";
     html += ".card{background:#16213e;border-radius:8px;padding:12px;margin:8px 0}";
     html += ".value{font-size:1.3em;font-weight:bold;color:#0f0}.bad{color:#f44}";
     html += ".btn-on{background:#0a0;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
@@ -77,12 +87,13 @@ void handleRoot() {
     html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
     html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}.mode-btn.auto{background:#0a0}";
-    html += ".sp-label{display:inline-block;width:80px;text-align:right;margin-right:8px}";
-    html += ".sp-range{width:140px;margin:0 8px;vertical-align:middle}";
-    html += ".sp-val{display:inline-block;width:45px;color:#0f0;font-weight:bold}";
+    html += ".sp-label{display:inline-block;width:85px;text-align:right;margin-right:8px;font-size:0.85em}";
+    html += ".sp-range{width:120px;margin:0 8px;vertical-align:middle}";
+    html += ".sp-val{display:inline-block;width:40px;color:#0f0;font-weight:bold;font-size:0.85em}";
     html += ".sp-apply{background:#0af;color:#000;border:none;padding:6px 20px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:8px}";
-    html += ".sp-apply:hover{background:#0cf}.sp-row{margin:4px 0}";
+    html += ".sp-apply:hover{background:#0cf}.sp-row{margin:3px 0}";
     html += ".sp-saved{color:#0f0;font-size:0.8em;margin-left:10px;display:none}";
+    html += ".sp-err{color:#f44;font-size:0.8em;margin-left:10px;display:none}";
     html += "</style></head><body><h1>🏊 Pool Controller</h1>";
     html += "<div class='card'><h2>System</h2>";
     html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
@@ -114,6 +125,19 @@ void handleRoot() {
     if (phPumpCtrl) html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(), phPumpCtrl->getLastOnDuration() / 60000, phPumpCtrl->getRuntimeMinutes()) + "<br>";
     if (chlorinePumpCtrl) html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(), chlorinePumpCtrl->getLastOnDuration() / 60000, chlorinePumpCtrl->getRuntimeMinutes()) + "<br>";
     html += "</p></div>";
+    html += "<div class='card'><h2>⚙️ Pump Runtime Settings</h2>";
+    html += "<h3>pH Pump</h3>";
+    html += pumpConfigSlider("ph", "minOn", "Min On Time", cfg.phPump.minOnTimeSec, 5, 300, 1, "sec");
+    html += pumpConfigSlider("ph", "minOff", "Min Off Time", cfg.phPump.minOffTimeSec, 10, 600, 1, "sec");
+    html += pumpConfigSlider("ph", "maxDaily", "Max Daily", cfg.phPump.maxDailyRuntimeMin, 10, 1440, 10, "min");
+    html += "<h3>Chlorine Pump</h3>";
+    html += pumpConfigSlider("chlorine", "minOn", "Min On Time", cfg.chlorinePump.minOnTimeSec, 5, 300, 1, "sec");
+    html += pumpConfigSlider("chlorine", "minOff", "Min Off Time", cfg.chlorinePump.minOffTimeSec, 10, 600, 1, "sec");
+    html += pumpConfigSlider("chlorine", "maxDaily", "Max Daily", cfg.chlorinePump.maxDailyRuntimeMin, 10, 1440, 10, "min");
+    html += "<h3>Filter Pump</h3>";
+    html += pumpConfigSlider("filter", "maxDaily", "Max Daily", cfg.filterPump.maxDailyRuntimeMin, 60, 1440, 30, "min");
+    html += "<button class='sp-apply' onclick=\"applyPumpConfig(event)\">Apply Pump Settings</button><span class='sp-saved' id='pump-saved'>✅ Saved!</span><span class='sp-err' id='pump-err'>❌ Error</span>";
+    html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Min On/Off = Taktschutz. Max Daily = Überdosierungsschutz (wirkt sofort).</p></div>";
     html += "<div class='card'><h2>Relay Test</h2><p>";
     for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) html += relayButton(i, relayManager.getRelayState(i));
     html += "</p></div>";
@@ -123,6 +147,24 @@ void handleRoot() {
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
     html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
+    html += "function applyPumpConfig(e){var btn=e.target;btn.textContent='Saving...';btn.disabled=true;";
+    html += "var ps=document.getElementById('pump-saved');var pe=document.getElementById('pump-err');ps.style.display='none';pe.style.display='none';";
+    html += "var pumps=['ph','chlorine'];var done=0,total=pumps.length;";
+    html += "pumps.forEach(function(pid){";
+    html += "var minOn=document.getElementById(pid+'-minOn');var minOff=document.getElementById(pid+'-minOff');var maxD=document.getElementById(pid+'-maxDaily');";
+    html += "var url='/api/pump/config?id='+pid+'&minOn='+minOn.value+'&minOff='+minOff.value+'&maxDaily='+maxD.value;";
+    html += "fetch(url).then(r=>r.json()).then(d=>{done++;updatePumpLive(pid,d);if(done>=total)checkDone(btn)}).catch(function(){done++;if(done>=total)checkDone(btn)})});";
+    html += "var fMax=document.getElementById('filter-maxDaily').value;";
+    html += "fetch('/api/pump/config?id=filter&maxDaily='+fMax).then(r=>r.json()).then(d=>{if(d.ok)updatePumpLive('filter',d);finalDone(btn)}).catch(function(){finalDone(btn)});";
+    html += "function checkDone(b){/* both chems done, filter might still run */}";
+    html += "function finalDone(b){b.textContent='Apply Pump Settings';b.disabled=false;ps.style.display='inline';setTimeout(function(){ps.style.display='none'},2500)}";
+    html += "function updatePumpLive(pid,d){if(!d.ok)return;if(pid==='ph'&&d.minOn){";
+    html += "fetch('/api/pump/live?id='+pid+'&minOn='+d.minOn+'&minOff='+d.minOff+'&maxDaily='+d.maxDaily).catch(function(){})}";
+    html += "else if(pid==='chlorine'&&d.minOn){";
+    html += "fetch('/api/pump/live?id='+pid+'&minOn='+d.minOn+'&minOff='+d.minOff+'&maxDaily='+d.maxDaily).catch(function(){})}";
+    html += "else if(pid==='filter'){";
+    html += "fetch('/api/pump/live?id='+pid+'&maxDaily='+d.maxDaily).catch(function(){})}}";
+    html += "}";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -186,10 +228,66 @@ void handleAPISetpoint() {
     webServer.send(changed ? 200 : 400, "application/json", "{\"ok\":" + String(changed) + "}");
 }
 
+void handleAPIPumpConfig() {
+    if (!webServer.hasArg("id")) { webServer.send(400, "application/json", "{\"error\":\"missing id\"}"); return; }
+    String id = webServer.arg("id");
+    AppConfig& cfg = configManager.get();
+    bool changed = false;
+
+    if (id == "ph" || id == "chlorine") {
+        PumpConfig& pumpCfg = (id == "ph") ? cfg.phPump : cfg.chlorinePump;
+        if (webServer.hasArg("minOn")) { int v = webServer.arg("minOn").toInt(); if (v >= 5 && v <= 300) { pumpCfg.minOnTimeSec = v; changed = true; } }
+        if (webServer.hasArg("minOff")) { int v = webServer.arg("minOff").toInt(); if (v >= 10 && v <= 600) { pumpCfg.minOffTimeSec = v; changed = true; } }
+        if (webServer.hasArg("maxDaily")) { float v = webServer.arg("maxDaily").toFloat(); if (v >= 10 && v <= 1440) { pumpCfg.maxDailyRuntimeMin = v; changed = true; } }
+    } else if (id == "filter") {
+        FilterPumpConfig& filterCfg = cfg.filterPump;
+        if (webServer.hasArg("maxDaily")) { float v = webServer.arg("maxDaily").toFloat(); if (v >= 60 && v <= 1440) { filterCfg.maxDailyRuntimeMin = v; changed = true; } }
+    } else {
+        webServer.send(400, "application/json", "{\"error\":\"bad id\"}");
+        return;
+    }
+
+    if (changed) configManager.save();
+
+    StaticJsonDocument<128> doc;
+    doc["ok"] = changed;
+    doc["pump"] = id;
+    if (id == "ph" || id == "chlorine") {
+        PumpConfig& pumpCfg = (id == "ph") ? cfg.phPump : cfg.chlorinePump;
+        doc["minOn"] = pumpCfg.minOnTimeSec;
+        doc["minOff"] = pumpCfg.minOffTimeSec;
+        doc["maxDaily"] = pumpCfg.maxDailyRuntimeMin;
+    } else {
+        doc["maxDaily"] = cfg.filterPump.maxDailyRuntimeMin;
+    }
+    String json; serializeJson(doc, json);
+    webServer.send(200, "application/json", json);
+}
+
+void handleAPIPumpLive() {
+    if (!webServer.hasArg("id")) { webServer.send(400, "application/json", "{\"error\":\"missing id\"}"); return; }
+    String id = webServer.arg("id");
+    PumpController* pump = nullptr;
+    if (id == "filter") pump = filterPumpCtrl;
+    else if (id == "ph") pump = phPumpCtrl;
+    else if (id == "chlorine") pump = chlorinePumpCtrl;
+    if (!pump) { webServer.send(400, "application/json", "{\"error\":\"bad id\"}"); return; }
+
+    if (id == "ph" || id == "chlorine") {
+        if (webServer.hasArg("minOn")) pump->setMinOnTime(webServer.arg("minOn").toInt() * 1000UL);
+        if (webServer.hasArg("minOff")) pump->setMinOffTime(webServer.arg("minOff").toInt() * 1000UL);
+    }
+    if (webServer.hasArg("maxDaily")) pump->setMaxDailyRuntime((unsigned long)(webServer.arg("maxDaily").toFloat() * 60000));
+
+    webServer.send(200, "application/json", "{\"ok\":true,\"pump\":\"" + id + "\"}");
+}
+
 void setupWebServer() {
     webServer.on("/", handleRoot); webServer.on("/api", handleAPI); webServer.on("/api/relay/set", handleAPIRelaySet);
     webServer.on("/api/pump/set", handleAPIPumpSet); webServer.on("/api/manual", handleAPIManualMode);
     webServer.on("/api/alloff", handleAPIAllOff); webServer.on("/api/setpoint", handleAPISetpoint);
+    webServer.on("/api/pump/config", handleAPIPumpConfig);
+    webServer.on("/api/pump/live", handleAPIPumpLive);
     webServer.begin();
 }
 
