@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 4  // added reverseAction to PIDParams
+#define CONFIG_VERSION 5  // added reverseAction to PIDParams
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -22,11 +22,11 @@
   #define DEFAULT_MQTT_USERNAME SECRET_MQTT_USERNAME
   #define DEFAULT_MQTT_PASSWORD SECRET_MQTT_PASSWORD
 #else
-  #define DEFAULT_WIFI_SSID     "YOUR_WIFI_SSID"
-  #define DEFAULT_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-  #define DEFAULT_MQTT_BROKER   "192.168.178.100"
-  #define DEFAULT_MQTT_USERNAME ""
-  #define DEFAULT_MQTT_PASSWORD ""
+  #define DEFAULT_WIFI_SSID     "Mayer2"
+  #define DEFAULT_WIFI_PASSWORD "Moritz26tOR"
+  #define DEFAULT_MQTT_BROKER   "192.168.178.223"
+  #define DEFAULT_MQTT_USERNAME "mqttuser"
+  #define DEFAULT_MQTT_PASSWORD "mqttuser"
 #endif
 
 struct PIDParams {
