@@ -84,8 +84,10 @@ inline void apply(AppConfig& cfg) {
     cfg.relayCount = MAX_RELAYS;
 
     // ═══════════════════════════════════════════════════════════════════
-    //  PUMPEN — Kanal-Zuordnung & Laufzeit-Limits
+    //  PUMPEN — Kanal-Zuordnung & Takt-Schutz
     // ═══════════════════════════════════════════════════════════════════
+    //  minOnTimeSec  = Mindest-Einschaltdauer (verhindert Flattern)
+    //  minOffTimeSec = Mindest-Ruhezeit zwischen Zyklen (verhindert Dauertakten)
 
     // ── pH Pumpe (Relais 1) ──────────────────────────────────────────
     cfg.phPump.relayChannel        = 1;
@@ -101,6 +103,8 @@ inline void apply(AppConfig& cfg) {
 
     // ── Filter Pumpe (Relais 0) ──────────────────────────────────────
     cfg.filterPump.relayChannel       = 0;
+    cfg.filterPump.minOnTimeSec       = 60;    // min. 1 min laufen (Motorschutz)
+    cfg.filterPump.minOffTimeSec      = 300;   // min. 5 min Pause (Druckabbau)
     cfg.filterPump.tempSlope          = 8.0;    // min/Tag pro °C Wassertemp
     cfg.filterPump.tempIntercept      = -40.0;  // Basis-Offset
     cfg.filterPump.windowStart        = "07:00";

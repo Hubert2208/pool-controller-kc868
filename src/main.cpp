@@ -17,6 +17,7 @@
 void setupWiFi();
 void setupWebServer();
 void handleMQTTCommand(const char* topic, const String& payload);
+void applyPumpConfig();
 
 ConfigManager configManager;
 RelayManager relayManager;
@@ -60,6 +61,14 @@ String relayButton(int channel, bool state) {
     return "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
 }
 
+String pumpTimingRow(const char* id, const char* label, int minOn, int minOff) {
+    String out = "<div class='pt-row'><span class='pt-label'>" + String(label) + ":</span>";
+    out += " min ON <input type='number' class='pt-input' id='pto-" + String(id) + "' value='" + String(minOn) + "' min='1' max='3600' step='1'> sec";
+    out += " | min OFF <input type='number' class='pt-input' id='ptf-" + String(id) + "' value='" + String(minOff) + "' min='1' max='7200' step='1'> sec";
+    out += "</div>";
+    return out;
+}
+
 void handleRoot() {
     AppConfig& cfg = configManager.get();
     String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
@@ -83,6 +92,9 @@ void handleRoot() {
     html += ".sp-apply{background:#0af;color:#000;border:none;padding:6px 20px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:8px}";
     html += ".sp-apply:hover{background:#0cf}.sp-row{margin:4px 0}";
     html += ".sp-saved{color:#0f0;font-size:0.8em;margin-left:10px;display:none}";
+    html += ".pt-row{margin:4px 0;font-size:0.85em}";
+    html += ".pt-label{display:inline-block;width:70px}";
+    html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center}";
     html += "</style></head><body><h1>🏊 Pool Controller</h1>";
     html += "<div class='card'><h2>System</h2>";
     html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
@@ -105,6 +117,13 @@ void handleRoot() {
     html += "<div class='sp-row'><span class='sp-label'>ORP Target:</span><input type='range' class='sp-range' id='sp-orp-range' min='200' max='900' step='10' value='" + String((int)orpSP) + "' oninput=\"document.getElementById('sp-orp-val').textContent=this.value\"><span class='sp-val' id='sp-orp-val'>" + String((int)orpSP) + "</span> mV</div>";
     html += "<button class='sp-apply' onclick=\"applySetpoints(event)\">Apply Setpoints</button><span class='sp-saved' id='sp-saved'>✅ Saved!</span>";
     html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Changes take effect immediately.</p></div>";
+    html += "<div class='card'><h2>⏱️ Pump Timing (Anti-Short-Cycle)</h2>";
+    html += "<p style='font-size:0.75em;color:#888;margin:0 0 8px 0'>Pump won't start until min OFF time elapsed; won't stop until min ON time elapsed.</p>";
+    html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec);
+    html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec);
+    html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec);
+    html += "<button class='sp-apply' onclick=\"applyPumpTiming(event)\">Apply Timing</button><span class='sp-saved' id='pt-saved'>✅ Saved!</span>";
+    html += "</div>";
     html += "<div class='card'><h2>Control Mode</h2><p>";
     if (manualMode) html += "<button class='mode-btn auto' onclick=\"fetch('/api/manual?mode=0').then(r=>r.json()).then(d=>location.reload())\">Return to AUTO Mode</button>";
     else html += "<button class='mode-btn' onclick=\"fetch('/api/manual?mode=1').then(r=>r.json()).then(d=>location.reload())\">Switch to MANUAL Mode</button>";
@@ -123,6 +142,7 @@ void handleRoot() {
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
     html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
+    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -186,10 +206,34 @@ void handleAPISetpoint() {
     webServer.send(changed ? 200 : 400, "application/json", "{\"ok\":" + String(changed) + "}");
 }
 
+void handleAPIPumpTiming() {
+    AppConfig& cfg = configManager.get();
+    bool changed = false;
+
+    auto applyTiming = [](int val, int& target, int minVal, int maxVal) -> bool {
+        if (val >= minVal && val <= maxVal) { target = val; return true; }
+        return false;
+    };
+
+    if (webServer.hasArg("ph_on")) { int v = webServer.arg("ph_on").toInt(); if (applyTiming(v, cfg.phPump.minOnTimeSec, 1, 3600)) changed = true; }
+    if (webServer.hasArg("ph_off")) { int v = webServer.arg("ph_off").toInt(); if (applyTiming(v, cfg.phPump.minOffTimeSec, 1, 7200)) changed = true; }
+    if (webServer.hasArg("cl_on")) { int v = webServer.arg("cl_on").toInt(); if (applyTiming(v, cfg.chlorinePump.minOnTimeSec, 1, 3600)) changed = true; }
+    if (webServer.hasArg("cl_off")) { int v = webServer.arg("cl_off").toInt(); if (applyTiming(v, cfg.chlorinePump.minOffTimeSec, 1, 7200)) changed = true; }
+    if (webServer.hasArg("filter_on")) { int v = webServer.arg("filter_on").toInt(); if (applyTiming(v, cfg.filterPump.minOnTimeSec, 1, 3600)) changed = true; }
+    if (webServer.hasArg("filter_off")) { int v = webServer.arg("filter_off").toInt(); if (applyTiming(v, cfg.filterPump.minOffTimeSec, 1, 7200)) changed = true; }
+
+    if (changed) {
+        configManager.save();
+        applyPumpConfig();
+    }
+    webServer.send(changed ? 200 : 400, "application/json", "{\"ok\":" + String(changed) + "}");
+}
+
 void setupWebServer() {
     webServer.on("/", handleRoot); webServer.on("/api", handleAPI); webServer.on("/api/relay/set", handleAPIRelaySet);
     webServer.on("/api/pump/set", handleAPIPumpSet); webServer.on("/api/manual", handleAPIManualMode);
     webServer.on("/api/alloff", handleAPIAllOff); webServer.on("/api/setpoint", handleAPISetpoint);
+    webServer.on("/api/pump/timing", handleAPIPumpTiming);
     webServer.begin();
 }
 
@@ -206,6 +250,26 @@ void maintainWiFi() {
     else if (WiFi.status() == WL_CONNECTED) wifiConnected = true;
 }
 
+void applyPumpConfig() {
+    AppConfig& cfg = configManager.get();
+    if (phPumpCtrl) {
+        phPumpCtrl->setMinOnTime((unsigned long)(cfg.phPump.minOnTimeSec * 1000));
+        phPumpCtrl->setMinOffTime((unsigned long)(cfg.phPump.minOffTimeSec * 1000));
+    }
+    if (chlorinePumpCtrl) {
+        chlorinePumpCtrl->setMinOnTime((unsigned long)(cfg.chlorinePump.minOnTimeSec * 1000));
+        chlorinePumpCtrl->setMinOffTime((unsigned long)(cfg.chlorinePump.minOffTimeSec * 1000));
+    }
+    if (filterPumpCtrl) {
+        filterPumpCtrl->setMinOnTime((unsigned long)(cfg.filterPump.minOnTimeSec * 1000));
+        filterPumpCtrl->setMinOffTime((unsigned long)(cfg.filterPump.minOffTimeSec * 1000));
+    }
+    log_i("Pump timing applied: pH=%d/%ds Cl=%d/%ds Filter=%d/%ds",
+          cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec,
+          cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec,
+          cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec);
+}
+
 void handleMQTTCommand(const char* topic, const String& payload) {
     String t = String(topic); AppConfig& cfg = configManager.get(); String base = cfg.mqtt.baseTopic + "/command/";
     if (t == base + "ph_setpoint") { float v = payload.toFloat(); if (v >= 6.0 && v <= 8.0 && chemistryController) chemistryController->setPHSetpoint(v); }
@@ -215,6 +279,21 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     else if (t == base + "all_off") relayManager.allOff();
     else if (t == base + "reset_config") { if (payload == "confirm") { configManager.get() = AppConfig(); configManager.save(); delay(1000); ESP.restart(); } }
     else if (t == base + "restart") { if (payload == "confirm") { delay(500); ESP.restart(); } }
+    else if (t == base + "pump_timing") {
+        // JSON payload: {"ph":{"minOn":30,"minOff":120},"chlorine":{"minOn":30,"minOff":120},"filter":{"minOn":60,"minOff":300}}
+        StaticJsonDocument<256> doc;
+        if (deserializeJson(doc, payload) == DeserializationError::Ok) {
+            if (doc["ph"]["minOn"].is<int>()) cfg.phPump.minOnTimeSec = doc["ph"]["minOn"];
+            if (doc["ph"]["minOff"].is<int>()) cfg.phPump.minOffTimeSec = doc["ph"]["minOff"];
+            if (doc["chlorine"]["minOn"].is<int>()) cfg.chlorinePump.minOnTimeSec = doc["chlorine"]["minOn"];
+            if (doc["chlorine"]["minOff"].is<int>()) cfg.chlorinePump.minOffTimeSec = doc["chlorine"]["minOff"];
+            if (doc["filter"]["minOn"].is<int>()) cfg.filterPump.minOnTimeSec = doc["filter"]["minOn"];
+            if (doc["filter"]["minOff"].is<int>()) cfg.filterPump.minOffTimeSec = doc["filter"]["minOff"];
+            configManager.save();
+            applyPumpConfig();
+            log_i("MQTT: pump timing updated");
+        }
+    }
 }
 
 void feedWatchdog() { esp_task_wdt_reset(); watchdogCount++; }
@@ -233,9 +312,11 @@ void setup() {
     AppConfig& cfg = configManager.get();
     phPumpCtrl = new PumpController(relayManager, cfg.phPump.relayChannel, "pH Pump"); phPumpCtrl->begin();
     chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump"); chlorinePumpCtrl->begin();
-    phPumpCtrl->setMinOnTime(cfg.phPID.minOnTimeSec * 1000); phPumpCtrl->setMinOffTime(cfg.phPID.minOffTimeSec * 1000);
-    chlorinePumpCtrl->setMinOnTime(cfg.chlorinePID.minOnTimeSec * 1000); chlorinePumpCtrl->setMinOffTime(cfg.chlorinePID.minOffTimeSec * 1000);
     filterPumpCtrl = new PumpController(relayManager, cfg.filterPump.relayChannel, "Filter Pump"); filterPumpCtrl->begin();
+
+    // Apply anti-short-cycle timing from pump config (not PID params)
+    applyPumpConfig();
+
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl); filterPumpLogic->begin();
     filterPumpCtrl->addDependent(phPumpCtrl); filterPumpCtrl->addDependent(chlorinePumpCtrl);
     chemistryController = new PoolChemistryController(configManager, *sensorManager, *phPumpCtrl, *chlorinePumpCtrl); chemistryController->begin();

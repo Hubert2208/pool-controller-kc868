@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 5  // maxDailyRuntimeMin added to FilterPumpConfig; ConfigDefaults.h = single source of truth
+#define CONFIG_VERSION 6  // minOnTimeSec/minOffTimeSec added to FilterPumpConfig; pump config unified
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -86,8 +86,8 @@ struct MqttConfig {
 
 struct PumpConfig {
     int relayChannel = 0;
-    int minOnTimeSec = 30;
-    int minOffTimeSec = 120;
+    int minOnTimeSec = 30;   // Taktschutz: minimale Einschaltdauer
+    int minOffTimeSec = 120; // Taktschutz: minimale Ruhezeit
     float maxDailyRuntimeMin = 1440.0;  // 24h = de facto unlimited
 
     String toJson() const;
@@ -103,6 +103,8 @@ struct FilterPumpConfig {
     int minCycleMinutes = 60;
     int maxCycleMinutes = 480;
     float maxDailyRuntimeMin = 1440.0;  // 24h = de facto unlimited
+    int minOnTimeSec = 60;   // Taktschutz: minimale Einschaltdauer
+    int minOffTimeSec = 300; // Taktschutz: minimale Ruhezeit (5 min)
 
     String toJson() const;
     static FilterPumpConfig fromJson(JsonVariantConst json);
