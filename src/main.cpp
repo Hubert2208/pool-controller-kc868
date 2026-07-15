@@ -350,6 +350,8 @@ void loop() {
     if (chemistryController && systemReady && !manualMode) chemistryController->update();
     if (filterPumpLogic && sensorManager && !manualMode) filterPumpLogic->update(sensorManager->getWaterTemperature());
 
+    AppConfig& cfg = configManager.get();
+
     // MQTT State Publishing — matches HA Discovery value_template paths
     if (mqttManager && mqttManager->isConnected() && systemReady) {
         unsigned long now = millis();
@@ -418,7 +420,6 @@ void loop() {
         }
     }
 
-    AppConfig& cfg = configManager.get();
     unsigned long elapsed = millis() - loopStart;
     int delayMs = cfg.loopDelayMs - (int)elapsed;
     if (delayMs > 0) {
