@@ -190,7 +190,7 @@ RelayConfig RelayConfig::fromJson(JsonVariantConst json) {
 // ─── AppConfig ────────────────────────────────────────────────────────
 
 String AppConfig::toJson() const {
-    StaticJsonDocument<CONFIG_JSON_SIZE> doc;
+    DynamicJsonDocument doc(CONFIG_JSON_SIZE);
     JsonObject wifiObj = doc.createNestedObject("wifi");
     wifiObj["ssid"] = wifi.ssid;
     wifiObj["password"] = wifi.password;
@@ -378,7 +378,7 @@ bool ConfigManager::loadFromLittleFS() {
         return false;
     }
 
-    StaticJsonDocument<CONFIG_JSON_SIZE> doc;
+    DynamicJsonDocument doc(CONFIG_JSON_SIZE);
     DeserializationError error = deserializeJson(doc, file);
     file.close();
 
@@ -428,7 +428,7 @@ bool ConfigManager::save() {
 }
 
 bool ConfigManager::updateFromJson(const String& json) {
-    StaticJsonDocument<CONFIG_JSON_SIZE> doc;
+    DynamicJsonDocument doc(CONFIG_JSON_SIZE);
     DeserializationError error = deserializeJson(doc, json);
 
     if (error) {
