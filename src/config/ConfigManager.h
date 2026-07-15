@@ -8,10 +8,13 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 5  // added reverseAction to PIDParams
+#define CONFIG_VERSION 5  // maxDailyRuntimeMin added to FilterPumpConfig; ConfigDefaults.h = single source of truth
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
+
+// ── Defaults: ConfigDefaults.h ist die EINZIGE Datei für Werkseinstellungen.
+//    Struct-Initialisierer hier sind nur Fallback — in ConfigDefaults.h ändern!
 
 // Include local secrets if available (not committed to git)
 #if __has_include("secrets.h")
@@ -38,7 +41,7 @@ struct PIDParams {
     float outputMax = 100.0;
     int minOnTimeSec = 10;
     int minOffTimeSec = 60;
-    bool reverseAction = false;  // true = reverse acting (output↑ when PV↑), e.g. pH
+    bool reverseAction = false;
 
     String toJson() const;
     static PIDParams fromJson(JsonVariantConst json);
@@ -85,7 +88,7 @@ struct PumpConfig {
     int relayChannel = 0;
     int minOnTimeSec = 30;
     int minOffTimeSec = 120;
-    float maxDailyRuntimeMin = 1440.0;
+    float maxDailyRuntimeMin = 1440.0;  // 24h = de facto unlimited
 
     String toJson() const;
     static PumpConfig fromJson(JsonVariantConst json);
@@ -93,12 +96,13 @@ struct PumpConfig {
 
 struct FilterPumpConfig {
     int relayChannel = 0;
-    float tempSlope = 8.0;    // warmer water → more filtration (min/day per °C)
-    float tempIntercept = -40.0; // baseline offset
+    float tempSlope = 8.0;
+    float tempIntercept = -40.0;
     String windowStart = "07:00";
     String windowEnd = "21:00";
     int minCycleMinutes = 60;
     int maxCycleMinutes = 480;
+    float maxDailyRuntimeMin = 1440.0;  // 24h = de facto unlimited
 
     String toJson() const;
     static FilterPumpConfig fromJson(JsonVariantConst json);
@@ -152,7 +156,6 @@ private:
     void setDefaults();
     bool loadFromLittleFS();
     bool saveToLittleFS();
-    bool createDefaultConfig();
 };
 
 #endif // CONFIG_MANAGER_H

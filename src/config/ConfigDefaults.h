@@ -3,6 +3,23 @@
 
 #include "ConfigManager.h"
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  CONFIG DEFAULTS — SINGLE SOURCE OF TRUTH
+//  ─────────────────────────────────────────────────────────────────────────────
+//  JEDER konfigurierbare Default-Wert wird HIER gesetzt.
+//  Diese Datei ist die EINZIGE Stelle, die du bearbeiten musst, um
+//  Werkseinstellungen zu ändern.
+//
+//  Wie die Defaults aufs Board kommen:
+//   1. Beim ersten Boot (kein /config.json auf LittleFS)
+//   2. Bei CONFIG_VERSION-Änderung (alte Config wird verworfen)
+//   3. Nach LittleFS-Formatierung
+//
+//  CONFIG_VERSION in ConfigManager.h erhöhen, wenn du hier Felder
+//  hinzufügst/entfernst → bestehende Boards bekommen dann die neuen
+//  Defaults beim nächsten Boot.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Include local secrets if available (not committed to git)
 #if __has_include("secrets.h")
   #include "secrets.h"
@@ -21,77 +38,148 @@
 
 namespace SetDefaults {
 
-inline void apply(AppConfig& _config) {
-    // ─── WiFi defaults ───
-    _config.wifi.ssid        = DEFAULT_WIFI_SSID;
-    _config.wifi.password    = DEFAULT_WIFI_PASSWORD;
-    _config.wifi.hostname    = "poolcontroller";
-    _config.wifi.fallbackAP  = false;
-    _config.wifi.apSSID      = "PoolController-AP";
-    _config.wifi.apPassword  = "12345678";
+inline void apply(AppConfig& cfg) {
 
-    // ─── MQTT defaults ───
-    _config.mqtt.broker      = DEFAULT_MQTT_BROKER;
-    _config.mqtt.port        = 1883;
-    _config.mqtt.clientId    = "poolcontroller";
-    _config.mqtt.username    = DEFAULT_MQTT_USERNAME;
-    _config.mqtt.password    = DEFAULT_MQTT_PASSWORD;
-    _config.mqtt.baseTopic   = "pool";
-    _config.mqtt.keepAliveSec = 60;
+    // ═══════════════════════════════════════════════════════════════════
+    //  CONFIG VERSION
+    // ═══════════════════════════════════════════════════════════════════
+    cfg.configVersion = CONFIG_VERSION;
+    cfg.logLevel = 1;
+    cfg.loopDelayMs = 100;
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  WIFI
+    // ═══════════════════════════════════════════════════════════════════
+    cfg.wifi.ssid        = DEFAULT_WIFI_SSID;
+    cfg.wifi.password    = DEFAULT_WIFI_PASSWORD;
+    cfg.wifi.hostname    = "poolcontroller";
+    cfg.wifi.fallbackAP  = false;
+    cfg.wifi.apSSID      = "PoolController-AP";
+    cfg.wifi.apPassword  = "12345678";
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  MQTT
+    // ═══════════════════════════════════════════════════════════════════
+    cfg.mqtt.broker      = DEFAULT_MQTT_BROKER;
+    cfg.mqtt.port        = 1883;
+    cfg.mqtt.clientId    = "poolcontroller";
+    cfg.mqtt.username    = DEFAULT_MQTT_USERNAME;
+    cfg.mqtt.password    = DEFAULT_MQTT_PASSWORD;
+    cfg.mqtt.baseTopic   = "pool";
+    cfg.mqtt.keepAliveSec = 60;
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  RELAYS (8x KC868-A8)
+    // ═══════════════════════════════════════════════════════════════════
     const char* relayNames[MAX_RELAYS] = {
         "Filter Pumpe", "pH Pumpe", "Chlor Pumpe",
-        "Relay 4", "Relay 5", "Relay 6",
-        "Relay 7", "Relay 8"
+        "Relay 4", "Relay 5", "Relay 6", "Relay 7", "Relay 8"
     };
     for (int i = 0; i < MAX_RELAYS; i++) {
-        _config.relays[i].channel = i;
-        _config.relays[i].name = relayNames[i];
-        _config.relays[i].normallyOpen = true;
-        _config.relays[i].maxOnTimeSec = 0;
+        cfg.relays[i].channel      = i;
+        cfg.relays[i].name         = relayNames[i];
+        cfg.relays[i].normallyOpen = true;
+        cfg.relays[i].maxOnTimeSec = 0;
     }
-    _config.relayCount = MAX_RELAYS;
+    cfg.relayCount = MAX_RELAYS;
 
-    _config.phPump.relayChannel       = 1;
-    _config.chlorinePump.relayChannel = 2;
-    _config.filterPump.relayChannel   = 0;
+    // ═══════════════════════════════════════════════════════════════════
+    //  PUMPEN — Kanal-Zuordnung & Laufzeit-Limits
+    // ═══════════════════════════════════════════════════════════════════
 
-    _config.phSensor.simMin          = 6.8f;
-    _config.phSensor.simMax          = 7.6f;
-    _config.phSensor.simDriftPerHour = 0.05f;
+    // ── pH Pumpe (Relais 1) ──────────────────────────────────────────
+    cfg.phPump.relayChannel        = 1;
+    cfg.phPump.minOnTimeSec        = 30;    // Taktschutz: min. Ein-Zeit
+    cfg.phPump.minOffTimeSec       = 120;   // Taktschutz: min. Pause
+    cfg.phPump.maxDailyRuntimeMin  = 120;   // Überdosierungsschutz: 2h/Tag
 
-    _config.orpSensor.simMin          = 200.0f;
-    _config.orpSensor.simMax          = 800.0f;
-    _config.orpSensor.simDriftPerHour = 10.0f;
+    // ── Chlor Pumpe (Relais 2) ───────────────────────────────────────
+    cfg.chlorinePump.relayChannel        = 2;
+    cfg.chlorinePump.minOnTimeSec        = 30;
+    cfg.chlorinePump.minOffTimeSec       = 120;
+    cfg.chlorinePump.maxDailyRuntimeMin  = 240;  // 4h/Tag
 
-    _config.tempAirSensor.simMin       = 10.0f;
-    _config.tempAirSensor.simMax       = 40.0f;
-    _config.tempWaterSensor.simMin     = 5.0f;
-    _config.tempWaterSensor.simMax     = 35.0f;
+    // ── Filter Pumpe (Relais 0) ──────────────────────────────────────
+    cfg.filterPump.relayChannel       = 0;
+    cfg.filterPump.tempSlope          = 8.0;    // min/Tag pro °C Wassertemp
+    cfg.filterPump.tempIntercept      = -40.0;  // Basis-Offset
+    cfg.filterPump.windowStart        = "07:00";
+    cfg.filterPump.windowEnd          = "21:00";
+    cfg.filterPump.minCycleMinutes    = 60;     // kürzester Zyklus
+    cfg.filterPump.maxCycleMinutes    = 480;    // längster Zyklus
+    cfg.filterPump.maxDailyRuntimeMin = 720;    // Tageslimit: 12h
 
-    _config.pressureSensor.simMin          = 0.0f;
-    _config.pressureSensor.simMax          = 2.5f;
-    _config.pressureSensor.simDriftPerHour = 0.1f;
+    // ═══════════════════════════════════════════════════════════════════
+    //  PID-REGLER
+    // ═══════════════════════════════════════════════════════════════════
 
-    // pH PID: REVERSE acting — adding pH-Minus DECREASES pH
-    // When pH > setpoint → output should be positive → pump ON
-    _config.phPID.kp            = 1.2f;
-    _config.phPID.ki            = 0.08f;
-    _config.phPID.kd            = 0.04f;
-    _config.phPID.setpoint      = 7.2f;
-    _config.phPID.minOnTimeSec  = 15;
-    _config.phPID.minOffTimeSec = 60;
-    _config.phPID.reverseAction = true;
+    // pH PID: REVERSE acting — pH-Minus-Säure SENKT den pH-Wert
+    // Wenn pH > setpoint → Output positiv → Pumpe EIN
+    cfg.phPID.kp            = 1.2;
+    cfg.phPID.ki            = 0.08;
+    cfg.phPID.kd            = 0.04;
+    cfg.phPID.setpoint      = 7.2;
+    cfg.phPID.outputMin     = 0.0;
+    cfg.phPID.outputMax     = 100.0;
+    cfg.phPID.minOnTimeSec  = 15;
+    cfg.phPID.minOffTimeSec = 60;
+    cfg.phPID.reverseAction = true;
 
-    // Chlorine PID: DIRECT acting — adding chlorine INCREASES ORP
-    // When ORP < setpoint → output should be positive → pump ON
-    _config.chlorinePID.kp            = 0.8f;
-    _config.chlorinePID.ki            = 0.05f;
-    _config.chlorinePID.kd            = 0.02f;
-    _config.chlorinePID.setpoint      = 650.0f;
-    _config.chlorinePID.minOnTimeSec  = 30;
-    _config.chlorinePID.minOffTimeSec = 120;
+    // Chlor PID: DIRECT acting — Chlor HEBT den ORP-Wert
+    // Wenn ORP < setpoint → Output positiv → Pumpe EIN
+    cfg.chlorinePID.kp            = 0.8;
+    cfg.chlorinePID.ki            = 0.05;
+    cfg.chlorinePID.kd            = 0.02;
+    cfg.chlorinePID.setpoint      = 650.0;
+    cfg.chlorinePID.outputMin     = 0.0;
+    cfg.chlorinePID.outputMax     = 100.0;
+    cfg.chlorinePID.minOnTimeSec  = 30;
+    cfg.chlorinePID.minOffTimeSec = 120;
     // reverseAction defaults to false (direct acting) for chlorine
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  SENSOREN
+    // ═══════════════════════════════════════════════════════════════════
+
+    // pH-Sensor (EZO pH, I²C)
+    cfg.phSensor.enabled          = true;
+    cfg.phSensor.simulate         = false;
+    cfg.phSensor.updateIntervalMs = 2000;
+    cfg.phSensor.simMin           = 6.8;
+    cfg.phSensor.simMax           = 7.6;
+    cfg.phSensor.simDriftPerHour  = 0.05;
+
+    // ORP-Sensor (EZO ORP, I²C)
+    cfg.orpSensor.enabled          = true;
+    cfg.orpSensor.simulate         = false;
+    cfg.orpSensor.updateIntervalMs = 2000;
+    cfg.orpSensor.simMin           = 200.0;
+    cfg.orpSensor.simMax           = 800.0;
+    cfg.orpSensor.simDriftPerHour  = 10.0;
+
+    // Lufttemperatur (DS18B20, OneWire)
+    cfg.tempAirSensor.enabled          = true;
+    cfg.tempAirSensor.simulate         = false;
+    cfg.tempAirSensor.updateIntervalMs = 5000;
+    cfg.tempAirSensor.simMin           = 10.0;
+    cfg.tempAirSensor.simMax           = 40.0;
+    cfg.tempAirSensor.simDriftPerHour  = 0.0;
+
+    // Wassertemperatur (DS18B20, OneWire)
+    cfg.tempWaterSensor.enabled          = true;
+    cfg.tempWaterSensor.simulate         = false;
+    cfg.tempWaterSensor.updateIntervalMs = 5000;
+    cfg.tempWaterSensor.simMin           = 5.0;
+    cfg.tempWaterSensor.simMax           = 35.0;
+    cfg.tempWaterSensor.simDriftPerHour  = 0.0;
+
+    // Drucksensor (analog, ADS1115)
+    cfg.pressureSensor.enabled          = true;
+    cfg.pressureSensor.simulate         = false;
+    cfg.pressureSensor.updateIntervalMs = 5000;
+    cfg.pressureSensor.simMin           = 0.0;
+    cfg.pressureSensor.simMax           = 2.5;
+    cfg.pressureSensor.simDriftPerHour  = 0.1;
 }
 
 } // namespace SetDefaults
