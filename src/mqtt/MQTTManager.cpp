@@ -181,9 +181,6 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     // ── Composite JSON sensors on pool-controller/sensors ──
-    // JSON format from SensorManager::getAllStateJSON():
-    //   {"orp":{"value":400,...},"water_temperature":{"value":25,...},
-    //    "air_temperature":{"value":22,...},"filter_pressure":{"value":1.2,"needs_backwash":false,...}}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "orp").c_str());
     payload = "{\"device_class\":\"voltage\",\"name\":\"Pool ORP\",\"unit_of_measurement\":\"mV\","
@@ -206,8 +203,6 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_at\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
-    // NOTE: No humidity sensor — SensorManager has no humidity getter.
-
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "filter_pressure").c_str());
     payload = "{\"device_class\":\"pressure\",\"name\":\"Filter Pressure\",\"unit_of_measurement\":\"bar\","
               "\"state_topic\":\"" + _baseTopic + "/sensors\","
@@ -216,9 +211,6 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     // ── Chemistry entities on pool-controller/chemistry ──
-    // JSON format from PoolChemistryController::getStateJSON():
-    //   {"ph":{"enabled":true,"setpoint":7.2,"pid_output":45.5,...},
-    //    "chlorine":{"enabled":true,"setpoint":650,"pid_output":60.0,...}}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph_pid_output").c_str());
     payload = "{\"name\":\"pH PID Output\",\"unit_of_measurement\":\"%\","
@@ -271,8 +263,6 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     // ── Filter entities on pool-controller/filter ──
-    // JSON format from FilterPumpLogic::getStateJSON():
-    //   {"enabled":true,"required_runtime_min":600,"pump_on":true,...}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "filter_required").c_str());
     payload = "{\"name\":\"Required Filter Runtime\",\"unit_of_measurement\":\"min\","
@@ -282,9 +272,6 @@ void MQTTManager::publishDiscovery() {
     _client.publish(topicBuf, payload.c_str(), true);
 
     // ── Pump entities on pool-controller/pumps ──
-    // JSON format from loop() pumpDoc:
-    //   {"ph_pump":{"name":"pH Pump","on":false,"runtime_today_min":12,...},
-    //    "chlorine_pump":{...},"filter_pump":{...}}
 
     snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("sensor", "ph_pump_runtime").c_str());
     payload = "{\"name\":\"pH Pump Runtime Today\",\"unit_of_measurement\":\"min\","
@@ -307,8 +294,66 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_firt\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
+    // ── Pump Timing (Anti-Short-Cycle) number entities ──
+    // State published on pool/pump_config, commands on pool/command/...
+    // JSON: {"ph":{"minOn":30,"minOff":120},"chlorine":{"minOn":30,"minOff":120},"filter":{"minOn":60,"minOff":300}}
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "ph_pump_min_on").c_str());
+    payload = "{\"name\":\"pH Pump Min ON\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.ph.minOn }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/ph_pump_min_on\","
+              "\"min\":1,\"max\":3600,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phmno\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "ph_pump_min_off").c_str());
+    payload = "{\"name\":\"pH Pump Min OFF\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.ph.minOff }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/ph_pump_min_off\","
+              "\"min\":1,\"max\":7200,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phmfo\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "cl_pump_min_on").c_str());
+    payload = "{\"name\":\"Chlorine Pump Min ON\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.chlorine.minOn }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/cl_pump_min_on\","
+              "\"min\":1,\"max\":3600,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_clmno\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "cl_pump_min_off").c_str());
+    payload = "{\"name\":\"Chlorine Pump Min OFF\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.chlorine.minOff }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/cl_pump_min_off\","
+              "\"min\":1,\"max\":7200,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_clmfo\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "filter_pump_min_on").c_str());
+    payload = "{\"name\":\"Filter Pump Min ON\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.filter.minOn }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/filter_pump_min_on\","
+              "\"min\":1,\"max\":3600,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fimno\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "filter_pump_min_off").c_str());
+    payload = "{\"name\":\"Filter Pump Min OFF\",\"unit_of_measurement\":\"s\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.filter.minOff }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/filter_pump_min_off\","
+              "\"min\":1,\"max\":7200,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fimfo\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
     _discoveryPublished = true;
-    log_i("HA discovery published (15 entities)");
+    log_i("HA discovery published (21 entities)");
 }
 
 void MQTTManager::mqttCallback(char* topic, byte* payload, unsigned int length) {

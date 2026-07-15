@@ -279,6 +279,14 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     else if (t == base + "all_off") relayManager.allOff();
     else if (t == base + "reset_config") { if (payload == "confirm") { configManager.get() = AppConfig(); configManager.save(); delay(1000); ESP.restart(); } }
     else if (t == base + "restart") { if (payload == "confirm") { delay(500); ESP.restart(); } }
+    // ── Individual pump timing commands (used by HA autodiscovery number entities) ──
+    else if (t == base + "ph_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.phPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    else if (t == base + "ph_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.phPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    else if (t == base + "cl_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.chlorinePump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    else if (t == base + "cl_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.chlorinePump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    else if (t == base + "filter_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.filterPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    else if (t == base + "filter_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.filterPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    // ── Bulk pump timing (JSON) ──
     else if (t == base + "pump_timing") {
         // JSON payload: {"ph":{"minOn":30,"minOff":120},"chlorine":{"minOn":30,"minOff":120},"filter":{"minOn":60,"minOff":300}}
         StaticJsonDocument<256> doc;
@@ -392,6 +400,21 @@ void loop() {
             String pumpStates;
             serializeJson(pumpDoc, pumpStates);
             mqttManager->publish("pumps", pumpStates, false);
+
+            // Pump timing config state (for HA autodiscovery number entities)
+            StaticJsonDocument<128> timingDoc;
+            JsonObject tph = timingDoc.createNestedObject("ph");
+            tph["minOn"] = cfg.phPump.minOnTimeSec;
+            tph["minOff"] = cfg.phPump.minOffTimeSec;
+            JsonObject tcl = timingDoc.createNestedObject("chlorine");
+            tcl["minOn"] = cfg.chlorinePump.minOnTimeSec;
+            tcl["minOff"] = cfg.chlorinePump.minOffTimeSec;
+            JsonObject tf = timingDoc.createNestedObject("filter");
+            tf["minOn"] = cfg.filterPump.minOnTimeSec;
+            tf["minOff"] = cfg.filterPump.minOffTimeSec;
+            String timingJson;
+            serializeJson(timingDoc, timingJson);
+            mqttManager->publish("pump_config", timingJson, false);
         }
     }
 
