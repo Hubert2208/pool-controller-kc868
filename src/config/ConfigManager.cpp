@@ -417,11 +417,6 @@ bool ConfigManager::saveToLittleFS() {
     return written > 0;
 }
 
-bool ConfigManager::createDefaultConfig() {
-    setDefaults();
-    return saveToLittleFS();
-}
-
 AppConfig& ConfigManager::get() {
     return _config;
 }
