@@ -147,6 +147,8 @@ String FilterPumpConfig::toJson() const {
     doc["minCycleMinutes"] = minCycleMinutes;
     doc["maxCycleMinutes"] = maxCycleMinutes;
     doc["maxDailyRuntimeMin"] = maxDailyRuntimeMin;
+    doc["minOnTimeSec"] = minOnTimeSec;
+    doc["minOffTimeSec"] = minOffTimeSec;
     String out;
     serializeJson(doc, out);
     return out;
@@ -163,6 +165,8 @@ FilterPumpConfig FilterPumpConfig::fromJson(JsonVariantConst json) {
         f.minCycleMinutes = json["minCycleMinutes"] | f.minCycleMinutes;
         f.maxCycleMinutes = json["maxCycleMinutes"] | f.maxCycleMinutes;
         f.maxDailyRuntimeMin = json["maxDailyRuntimeMin"] | f.maxDailyRuntimeMin;
+        f.minOnTimeSec = json["minOnTimeSec"] | f.minOnTimeSec;
+        f.minOffTimeSec = json["minOffTimeSec"] | f.minOffTimeSec;
     }
     return f;
 }
@@ -293,6 +297,8 @@ String AppConfig::toJson() const {
     fp["minCycleMinutes"] = filterPump.minCycleMinutes;
     fp["maxCycleMinutes"] = filterPump.maxCycleMinutes;
     fp["maxDailyRuntimeMin"] = filterPump.maxDailyRuntimeMin;
+    fp["minOnTimeSec"] = filterPump.minOnTimeSec;
+    fp["minOffTimeSec"] = filterPump.minOffTimeSec;
 
     JsonArray relaysArr = doc.createNestedArray("relays");
     for (int i = 0; i < relayCount; i++) {
@@ -506,6 +512,8 @@ bool ConfigManager::updateFromJson(const String& json) {
         if (o["minCycleMinutes"].is<int>()) current.filterPump.minCycleMinutes = o["minCycleMinutes"];
         if (o["maxCycleMinutes"].is<int>()) current.filterPump.maxCycleMinutes = o["maxCycleMinutes"];
         if (o["maxDailyRuntimeMin"].is<float>()) current.filterPump.maxDailyRuntimeMin = o["maxDailyRuntimeMin"];
+        if (o["minOnTimeSec"].is<int>()) current.filterPump.minOnTimeSec = o["minOnTimeSec"];
+        if (o["minOffTimeSec"].is<int>()) current.filterPump.minOffTimeSec = o["minOffTimeSec"];
     }
 
     if (doc["relayCount"].is<int>()) current.relayCount = doc["relayCount"];
