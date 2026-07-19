@@ -22,26 +22,11 @@ SensorSimulator::SensorSimulator(float minVal, float maxVal, float driftPerHour)
 {
 }
 
-void SensorSimulator::begin(float minVal, float maxVal, float driftPerHour) {
-    _minVal = minVal;
-    _maxVal = maxVal;
-    _driftPerHour = driftPerHour;
-    _currentValue = (minVal + maxVal) / 2.0f;
-    _target = (minVal + maxVal) / 2.0f;
-    _lastUpdate = millis();
-    _seed = esp_random();
-}
-
 void SensorSimulator::reset(unsigned long baseTime) {
     _currentValue = (_minVal + _maxVal) / 2.0f;
     _target = (_minVal + _maxVal) / 2.0f;
     _lastUpdate = baseTime > 0 ? baseTime : millis();
     _seed = esp_random();
-}
-
-float SensorSimulator::randomWalkStep() {
-    // Unused — kept for API compatibility
-    return 0.0f;
 }
 
 void SensorSimulator::update() {
@@ -52,7 +37,7 @@ void SensorSimulator::update() {
     }
 
     unsigned long deltaMs = now - _lastUpdate;
-    if (deltaMs < 100) return;  // don\'t update too often
+    if (deltaMs < 100) return;  // don't update too often
     _lastUpdate = now;
 
     // Calculate drift for this time step

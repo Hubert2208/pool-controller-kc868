@@ -119,33 +119,11 @@ bool MQTTManager::publish(const char* topicSuffix, const String& payload, bool r
     return ok;
 }
 
-void MQTTManager::publishState(const String& sensorStates, const String& chemistryState,
-                                const String& filterState, const String& pumpStates) {
-    unsigned long now = millis();
-    if (now - _lastPublishTime < MQTT_PUBLISH_INTERVAL_MS) return;
-    _lastPublishTime = now;
-
-    if (!_client.connected()) return;
-
-    publish("sensors", sensorStates, false);
-    publish("chemistry", chemistryState, false);
-    publish("filter", filterState, false);
-    publish("pumps", pumpStates, false);
-}
-
 void MQTTManager::publishOnline() {
     StaticJsonDocument<64> doc;
     doc["state"] = "online";
     doc["client"] = _config.get().mqtt.clientId.c_str();
     doc["version"] = "1.0.0";
-    String payload;
-    serializeJson(doc, payload);
-    publish("status/LWT", payload, true);
-}
-
-void MQTTManager::publishOffline() {
-    StaticJsonDocument<64> doc;
-    doc["state"] = "offline";
     String payload;
     serializeJson(doc, payload);
     publish("status/LWT", payload, true);

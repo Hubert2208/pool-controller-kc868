@@ -9,8 +9,7 @@ public:
     SensorSimulator(float minVal, float maxVal, float driftPerHour);
     ~SensorSimulator() = default;
 
-    // Initialize or reset the simulator
-    void begin(float minVal, float maxVal, float driftPerHour);
+    // Reset the simulator
     void reset(unsigned long baseTime = 0);
 
     // Update the simulated value — call periodically
@@ -18,9 +17,6 @@ public:
 
     // Get the current simulated value
     float getValue() const { return _currentValue; }
-
-    // Get the target/center value
-    float getTarget() const { return _target; }
 
     // Force a specific value
     void setValue(float val) { _currentValue = val; }
@@ -45,9 +41,6 @@ private:
     float _target;
     unsigned long _lastUpdate;
     unsigned long _seed;
-
-    // Random walk step
-    float randomWalkStep();
 
     // Pump-aware simulation state
     bool _pumpActive = false;

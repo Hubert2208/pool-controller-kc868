@@ -8,7 +8,7 @@ Intelligent pool water chemistry and filtration controller based on ESP32.
 - **PID Control**: pH and ORP-based chlorine dosing
 - **Sensor Support**: pH probe, ORP probe, DS18B20 water temp, DS18B20 air temp, pressure sensor
 - **Sensor Simulation**: Automatic fallback with pump-aware drift when real sensors are missing
-- **MQTT/HA**: Home Assistant auto-discovery via MQTT (16 entities)
+- **MQTT/HA**: Home Assistant auto-discovery via MQTT (21 entities)
 - **Config via LittleFS**: JSON config stored in flash (ArduinoJson 6.x)
 - **WiFi AP Fallback**: Configurable fallback access point
 - **Web Dashboard**: Status page on port 80
@@ -81,14 +81,17 @@ pool-controller/
 | `pool/chemistry` | Out | PID state, setpoints, enabled |
 | `pool/filter` | Out | Filter pump state, required runtime |
 | `pool/pumps` | Out | Dosing pump runtime stats |
+| `pool/pump_config` | Out | Pump anti-short-cycle timing config (JSON) |
+| `pool/ph` | Out | Raw pH value (dedicated topic) |
 | `pool/command/ph_setpoint` | In | Set pH target (6.0-8.0) |
 | `pool/command/orp_setpoint` | In | Set ORP target (200-900mV) |
 | `pool/command/ph_set_enabled` | In | Enable/disable pH control |
 | `pool/command/cl_set_enabled` | In | Enable/disable chlorine control |
-| `pool/command/relay` | In | Direct relay control `CH,STATE` |
 | `pool/command/all_off` | In | Emergency all relays off |
-| `pool/command/reset_config` | In | Reset to defaults |
-| `pool/command/restart` | In | ESP32 restart |
+| `pool/command/reset_config` | In | Reset to defaults (send 'confirm') |
+| `pool/command/restart` | In | ESP32 restart (send 'confirm') |
+| `pool/command/pump_timing` | In | Bulk pump timing config (JSON) |
+| `pool/command/*_pump_min_on/off` | In | Individual pump timing settings |
 | `pool/config/set` | In | Update config JSON at runtime |
 
 ## Building & Flashing

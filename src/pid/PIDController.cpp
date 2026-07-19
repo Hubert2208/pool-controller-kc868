@@ -18,24 +18,6 @@ PIDController::PIDController()
 {
 }
 
-PIDController::PIDController(float kp, float ki, float kd)
-    : _kp(kp)
-    , _ki(ki)
-    , _kd(kd)
-    , _setpoint(0.0f)
-    , _outputMin(0.0f)
-    , _outputMax(100.0f)
-    , _integral(0.0f)
-    , _lastInput(0.0f)
-    , _pTerm(0.0f)
-    , _iTerm(0.0f)
-    , _dTerm(0.0f)
-    , _reverseAction(false)
-    , _enabled(true)
-    , _firstRun(true)
-{
-}
-
 void PIDController::setTunings(float kp, float ki, float kd) {
     _kp = kp;
     _ki = ki;

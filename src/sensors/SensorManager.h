@@ -27,8 +27,6 @@ public:
     bool isORPConnected() const;
     bool isWaterTempConnected() const;
 
-    void setSimulationMode(bool simulatePH, bool simulateORP);
-
     SensorSimulator* getPHSimulator() { return _phSim; }
     SensorSimulator* getORPSimulator() { return _orpSim; }
 

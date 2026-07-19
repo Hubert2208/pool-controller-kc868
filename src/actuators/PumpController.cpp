@@ -190,16 +190,3 @@ void PumpController::updateDailyReset() const {
         }
     }
 }
-
-String PumpController::getStateJSON() const {
-    StaticJsonDocument<256> doc;
-    doc["name"] = _name;
-    doc["relay"] = _relayChannel;
-    doc["on"] = isOn();
-    doc["runtime_today_min"] = getRuntimeMinutes();
-    doc["last_on_duration_ms"] = getLastOnDuration();
-    doc["last_off_duration_ms"] = getLastOffDuration();
-    String out;
-    serializeJson(doc, out);
-    return out;
-}
