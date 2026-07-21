@@ -352,8 +352,38 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fimfo\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
+    // ── Pump Daily Runtime Limits number entities ──
+    // State on pool/pump_config, commands on pool/command/...
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "ph_pump_max_day").c_str());
+    payload = "{\"name\":\"pH Pump Max Daily\",\"unit_of_measurement\":\"min\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.ph.maxDailyMin }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/ph_pump_max_day\","
+              "\"min\":1,\"max\":1440,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_phmdr\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "cl_pump_max_day").c_str());
+    payload = "{\"name\":\"Chlorine Pump Max Daily\",\"unit_of_measurement\":\"min\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.chlorine.maxDailyMin }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/cl_pump_max_day\","
+              "\"min\":1,\"max\":1440,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_clmdr\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "filter_pump_max_day").c_str());
+    payload = "{\"name\":\"Filter Pump Max Daily\",\"unit_of_measurement\":\"min\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.filter.maxDailyMin }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/filter_pump_max_day\","
+              "\"min\":1,\"max\":1440,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fimdr\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
     _discoveryPublished = true;
-    log_i("HA discovery published (21 entities)");
+    log_i("HA discovery published (24 entities)");
 }
 
 void MQTTManager::mqttCallback(char* topic, byte* payload, unsigned int length) {

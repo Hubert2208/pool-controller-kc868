@@ -93,17 +93,17 @@ inline void apply(AppConfig& cfg) {
     cfg.phPump.relayChannel        = 1;
     cfg.phPump.minOnTimeSec        = 30;    // Taktschutz: min. Ein-Zeit
     cfg.phPump.minOffTimeSec       = 120;   // Taktschutz: min. Pause
-    cfg.phPump.maxDailyRuntimeMin  = 120;   // Überdosierungsschutz: 2h/Tag
+    cfg.phPump.maxDailyRuntimeMin  = 60;   // Überdosierungsschutz: 2h/Tag
 
     // ── Chlor Pumpe (Relais 2) ───────────────────────────────────────
     cfg.chlorinePump.relayChannel        = 2;
     cfg.chlorinePump.minOnTimeSec        = 30;
     cfg.chlorinePump.minOffTimeSec       = 120;
-    cfg.chlorinePump.maxDailyRuntimeMin  = 240;  // 4h/Tag
+    cfg.chlorinePump.maxDailyRuntimeMin  = 60;  // 4h/Tag
 
     // ── Filter Pumpe (Relais 0) ──────────────────────────────────────
     cfg.filterPump.relayChannel       = 0;
-    cfg.filterPump.minOnTimeSec       = 60;    // min. 1 min laufen (Motorschutz)
+    cfg.filterPump.minOnTimeSec       = 300;    // min. 1 min laufen (Motorschutz)
     cfg.filterPump.minOffTimeSec      = 300;   // min. 5 min Pause (Druckabbau)
     cfg.filterPump.tempSlope          = 8.0;    // min/Tag pro °C Wassertemp
     cfg.filterPump.tempIntercept      = -40.0;  // Basis-Offset
@@ -151,7 +151,7 @@ inline void apply(AppConfig& cfg) {
     cfg.phSensor.updateIntervalMs = 2000;
     cfg.phSensor.simMin           = 6.8;
     cfg.phSensor.simMax           = 7.6;
-    cfg.phSensor.simDriftPerHour  = 0.05;
+    cfg.phSensor.simDriftPerHour  = 0.01;
 
     // ORP-Sensor (EZO ORP, I²C)
     cfg.orpSensor.enabled          = true;
@@ -159,7 +159,7 @@ inline void apply(AppConfig& cfg) {
     cfg.orpSensor.updateIntervalMs = 2000;
     cfg.orpSensor.simMin           = 200.0;
     cfg.orpSensor.simMax           = 800.0;
-    cfg.orpSensor.simDriftPerHour  = 10.0;
+    cfg.orpSensor.simDriftPerHour  = 5.0;
 
     // Lufttemperatur (DS18B20, OneWire)
     cfg.tempAirSensor.enabled          = true;

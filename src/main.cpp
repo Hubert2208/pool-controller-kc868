@@ -61,10 +61,11 @@ String relayButton(int channel, bool state) {
     return "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
 }
 
-String pumpTimingRow(const char* id, const char* label, int minOn, int minOff) {
+String pumpTimingRow(const char* id, const char* label, int minOn, int minOff, float maxDailyMin) {
     String out = "<div class='pt-row'><span class='pt-label'>" + String(label) + ":</span>";
     out += " min ON <input type='number' class='pt-input' id='pto-" + String(id) + "' value='" + String(minOn) + "' min='1' max='3600' step='1'> sec";
     out += " | min OFF <input type='number' class='pt-input' id='ptf-" + String(id) + "' value='" + String(minOff) + "' min='1' max='7200' step='1'> sec";
+    out += " | max/day <input type='number' class='pt-input' style='width:68px' id='ptd-" + String(id) + "' value='" + String((int)maxDailyMin) + "' min='1' max='1440' step='1'> min";
     out += "</div>";
     return out;
 }
@@ -119,9 +120,9 @@ void handleRoot() {
     html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Changes take effect immediately.</p></div>";
     html += "<div class='card'><h2>⏱️ Pump Timing (Anti-Short-Cycle)</h2>";
     html += "<p style='font-size:0.75em;color:#888;margin:0 0 8px 0'>Pump won't start until min OFF time elapsed; won't stop until min ON time elapsed.</p>";
-    html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec);
-    html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec);
-    html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec);
+    html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec, cfg.phPump.maxDailyRuntimeMin);
+    html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec, cfg.chlorinePump.maxDailyRuntimeMin);
+    html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec, cfg.filterPump.maxDailyRuntimeMin);
     html += "<button class='sp-apply' onclick=\"applyPumpTiming(event)\">Apply Timing</button><span class='sp-saved' id='pt-saved'>✅ Saved!</span>";
     html += "</div>";
     html += "<div class='card'><h2>Control Mode</h2><p>";
@@ -142,7 +143,7 @@ void handleRoot() {
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
     html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
+    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff+'&ph_day='+document.getElementById('ptd-ph').value+'&cl_day='+document.getElementById('ptd-cl').value+'&filter_day='+document.getElementById('ptd-filter').value).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -221,6 +222,13 @@ void handleAPIPumpTiming() {
     if (webServer.hasArg("cl_off")) { int v = webServer.arg("cl_off").toInt(); if (applyTiming(v, cfg.chlorinePump.minOffTimeSec, 1, 7200)) changed = true; }
     if (webServer.hasArg("filter_on")) { int v = webServer.arg("filter_on").toInt(); if (applyTiming(v, cfg.filterPump.minOnTimeSec, 1, 3600)) changed = true; }
     if (webServer.hasArg("filter_off")) { int v = webServer.arg("filter_off").toInt(); if (applyTiming(v, cfg.filterPump.minOffTimeSec, 1, 7200)) changed = true; }
+    auto applyDaily = [](float val, float& target, float minVal, float maxVal) -> bool {
+        if (val >= minVal && val <= maxVal) { target = val; return true; }
+        return false;
+    };
+    if (webServer.hasArg("ph_day")) { float v = webServer.arg("ph_day").toFloat(); if (applyDaily(v, cfg.phPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
+    if (webServer.hasArg("cl_day")) { float v = webServer.arg("cl_day").toFloat(); if (applyDaily(v, cfg.chlorinePump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
+    if (webServer.hasArg("filter_day")) { float v = webServer.arg("filter_day").toFloat(); if (applyDaily(v, cfg.filterPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
 
     if (changed) {
         configManager.save();
@@ -286,6 +294,10 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     else if (t == base + "cl_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.chlorinePump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "filter_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.filterPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "filter_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.filterPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
+    // ── Individual daily limit commands ──
+    else if (t == base + "ph_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.phPump.maxDailyRuntimeMin = v; configManager.save(); } }
+    else if (t == base + "cl_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.chlorinePump.maxDailyRuntimeMin = v; configManager.save(); } }
+    else if (t == base + "filter_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.filterPump.maxDailyRuntimeMin = v; configManager.save(); } }
     // ── Bulk pump timing (JSON) ──
     else if (t == base + "pump_timing") {
         // JSON payload: {"ph":{"minOn":30,"minOff":120},"chlorine":{"minOn":30,"minOff":120},"filter":{"minOn":60,"minOff":300}}
@@ -414,6 +426,9 @@ void loop() {
             JsonObject tf = timingDoc.createNestedObject("filter");
             tf["minOn"] = cfg.filterPump.minOnTimeSec;
             tf["minOff"] = cfg.filterPump.minOffTimeSec;
+            tf["maxDailyMin"] = cfg.filterPump.maxDailyRuntimeMin;
+            tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
+            tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
             String timingJson;
             serializeJson(timingDoc, timingJson);
             mqttManager->publish("pump_config", timingJson, false);
