@@ -1,6 +1,94 @@
 #include "ConfigManager.h"
 #include "ConfigDefaults.h"
 
+// ─── Sensor Calibration ───────────────────────────────────────────────
+
+String CalibrationData::toJson() const {
+    StaticJsonDocument<CALIBRATION_JSON_SIZE> doc;
+    JsonObject ph = doc.createNestedObject("ph");
+    ph["slope"] = phSlope;
+    ph["intercept"] = phIntercept;
+    ph["voltagePH7"] = phVoltagePH7;
+    ph["voltagePH4"] = phVoltagePH4;
+    if (phCalibratedAt > 0) ph["calibratedAt"] = phCalibratedAt;
+
+    JsonObject orp = doc.createNestedObject("orp");
+    orp["offset"] = orpOffset;
+    orp["referenceMV"] = orpReferenceMV;
+    if (orpCalibratedAt > 0) orp["calibratedAt"] = orpCalibratedAt;
+
+    doc["calTemperature"] = calTemperature;
+
+    String out;
+    serializeJsonPretty(doc, out);
+    return out;
+}
+
+CalibrationData CalibrationData::fromJson(JsonVariantConst json) {
+    CalibrationData cal;
+    if (json["ph"].is<JsonObjectConst>()) {
+        JsonObjectConst ph = json["ph"];
+        cal.phSlope = ph["slope"] | cal.phSlope;
+        cal.phIntercept = ph["intercept"] | cal.phIntercept;
+        cal.phVoltagePH7 = ph["voltagePH7"] | cal.phVoltagePH7;
+        cal.phVoltagePH4 = ph["voltagePH4"] | cal.phVoltagePH4;
+        cal.phCalibratedAt = ph["calibratedAt"] | cal.phCalibratedAt;
+    }
+    if (json["orp"].is<JsonObjectConst>()) {
+        JsonObjectConst orp = json["orp"];
+        cal.orpOffset = orp["offset"] | cal.orpOffset;
+        cal.orpReferenceMV = orp["referenceMV"] | cal.orpReferenceMV;
+        cal.orpCalibratedAt = orp["calibratedAt"] | cal.orpCalibratedAt;
+    }
+    cal.calTemperature = json["calTemperature"] | cal.calTemperature;
+    return cal;
+}
+
+bool CalibrationData::save() {
+    if (!LittleFS.begin(true)) return false;
+
+    File file = LittleFS.open(CALIBRATION_FILE, FILE_WRITE);
+    if (!file) {
+        log_e("Calibration: failed to write file");
+        return false;
+    }
+
+    String json = toJson();
+    size_t written = file.print(json);
+    file.close();
+
+    log_i("Calibration saved (%u bytes)", written);
+    return written > 0;
+}
+
+bool CalibrationData::load() {
+    if (!LittleFS.begin(true)) return false;
+
+    if (!LittleFS.exists(CALIBRATION_FILE)) {
+        log_i("Calibration: no saved data, using factory defaults");
+        return false;
+    }
+
+    File file = LittleFS.open(CALIBRATION_FILE, FILE_READ);
+    if (!file) {
+        log_e("Calibration: failed to read file");
+        return false;
+    }
+
+    StaticJsonDocument<CALIBRATION_JSON_SIZE> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        log_e("Calibration: parse error: %s", error.c_str());
+        return false;
+    }
+
+    *this = fromJson(doc.as<JsonVariantConst>());
+    log_i("Calibration loaded: pH slope=%.3f, ORP offset=%.1f mV", phSlope, orpOffset);
+    return true;
+}
+
 // ─── Serialization helpers ────────────────────────────────────────────
 
 String PIDParams::toJson() const {
