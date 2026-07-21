@@ -1,6 +1,7 @@
-// Calibration Wizard — included by main.cpp (NOT compiled separately)
-// All globals (sensorManager, calibrationData, webServer, calState, etc.)
-// are declared in main.cpp before this #include.
+// Calibration Wizard — included by main.cpp only (NOT compiled separately)
+// The #ifndef guard prevents PlatformIO from compiling this as a standalone unit.
+#ifndef CALIBRATION_WIZARD_INCLUDED
+#define CALIBRATION_WIZARD_INCLUDED
 
 enum CalState { CAL_IDLE, CAL_PH_WAIT_7, CAL_PH_LOCKED_7, CAL_PH_WAIT_4, CAL_PH_LOCKED_4, CAL_ORP_WAIT, CAL_ORP_LOCKED };
 static CalState calState = CAL_IDLE;
@@ -130,3 +131,5 @@ void handleCalReset() {
     }
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
+
+#endif // CALIBRATION_WIZARD_INCLUDED
