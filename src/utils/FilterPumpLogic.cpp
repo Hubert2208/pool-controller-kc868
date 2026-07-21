@@ -115,29 +115,17 @@ void FilterPumpLogic::manageCycles() {
         // Decide whether to start a new cycle
         unsigned long timeSinceOff = now - _lastCycleOffTime;
 
-        // Wait at least minCycleMinutes between cycles (unless last cycle was short)
+        // Wait at least minCycleMinutes between cycles
         if (timeSinceOff >= minCycleMs) {
             _pump.turnOn();
             log_i("Filter pump ON (remaining %.0f min, cycle %lu min)",
                   remainingMs / 60000.0f, cycleDurationMs / 60000);
         }
     } else {
-        // Check if current cycle has run long enough
-        unsigned long cycleDuration = now - _pump.getLastOnDuration();
-        // Actually getCycleStartTime isn't exposed, so use simpler check:
-        unsigned long onDuration = (_pump.getLastOnDuration() > 0)
-            ? _pump.getLastOnDuration() : 0;
-
-        if (_pump.getLastOnDuration() > 0) {
-            unsigned long currentCycle = millis() - _pump.getLastOffDuration();
-            currentCycle = _pump.getLastOffDuration(); // still 0 while on...
-
-            // Simpler: just check if pump has been running longer than target
-            // We use runtime today to determine if we need more
-            if (currentRuntime >= targetRuntime) {
-                _pump.forceOff();
-                _lastCycleOffTime = now;
-            }
+        // Check if pump has been running long enough for current cycle
+        if (currentRuntime >= targetRuntime) {
+            _pump.forceOff();
+            _lastCycleOffTime = now;
         }
     }
 }

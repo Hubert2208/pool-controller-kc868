@@ -56,10 +56,6 @@ private:
     unsigned long _lastPHCycleStart;
     unsigned long _lastChlorineCycleStart;
 
-    // Required minimum on-time tracking
-    unsigned long _phOnDuration;
-    unsigned long _chlorineOnDuration;
-
     void updatePHPID(float dtSec);
     void updateChlorinePID(float dtSec);
 };

@@ -14,11 +14,8 @@ public:
     void begin();
     void loop();
     bool publish(const char* topicSuffix, const String& payload, bool retained = false);
-    void publishState(const String& sensorStates, const String& chemistryState,
-                      const String& filterState, const String& pumpStates);
     void publishDiscovery();
     void publishOnline();
-    void publishOffline();
     bool isConnected() { return _client.connected(); }
     void setCommandCallback(void (*callback)(const char* topic, const String& payload));
 
@@ -37,14 +34,6 @@ private:
     bool connect();
     void subscribeCommands();
     static void mqttCallback(char* topic, byte* payload, unsigned int length);
-
-    void publishSensorDiscovery(const char* deviceClass, const char* name,
-                                 const char* unit, const char* topic,
-                                 const char* icon);
-    void publishBinarySensorDiscovery(const char* deviceClass, const char* name,
-                                       const char* topic, const char* icon);
-    void publishSwitchDiscovery(const char* name, const char* commandTopic,
-                                 const char* stateTopic, const char* icon);
 
     static MQTTManager* _instance;
     void (*_commandCallback)(const char* topic, const String& payload);

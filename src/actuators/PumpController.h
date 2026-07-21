@@ -34,8 +34,6 @@ public:
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }
 
-    String getStateJSON() const;
-
 private:
     RelayManager& _relayManager;
     uint8_t _relayChannel;

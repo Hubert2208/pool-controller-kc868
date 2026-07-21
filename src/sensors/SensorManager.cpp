@@ -203,13 +203,6 @@ bool SensorManager::isWaterTempConnected() const {
     return _waterTempSensor && _waterTempSensor->isConnected();
 }
 
-void SensorManager::setSimulationMode(bool simulatePH, bool simulateORP) {
-    if (_phSensor) _phSensor->setEnabled(!simulatePH);
-    if (_orpSensor) _orpSensor->setEnabled(!simulateORP);
-    if (_phSim) _phSim->reset((unsigned long)millis());
-    if (_orpSim) _orpSim->reset((unsigned long)millis());
-}
-
 void SensorManager::setPHPumpActive(bool active) {
     if (_phSim) _phSim->setPumpActive(active);
 }

@@ -6,7 +6,6 @@
 class PIDController {
 public:
     PIDController();
-    PIDController(float kp, float ki, float kd);
 
     // Configure PID tunings
     void setTunings(float kp, float ki, float kd);
@@ -37,8 +36,6 @@ public:
     float getI() const { return _iTerm; }
     float getD() const { return _dTerm; }
     float getSetpoint() const { return _setpoint; }
-    float getIntegral() const { return _integral; }
-    float getLastInput() const { return _lastInput; }
 
     bool isEnabled() const { return _enabled; }
     void setEnabled(bool e) { _enabled = e; if (!e) reset(); }
