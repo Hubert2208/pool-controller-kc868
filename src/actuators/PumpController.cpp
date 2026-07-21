@@ -7,6 +7,7 @@ PumpController::PumpController(RelayManager& relayManager, uint8_t relayChannel,
     , _relayChannel(relayChannel)
     , _minOnTimeMs(30000)
     , _minOffTimeMs(120000)
+    , _filterPreRunDelayMs(0)
     , _lastOnTime(0)
     , _lastOffTime(0)
     , _cycleStartTime(0)
@@ -39,6 +40,20 @@ bool PumpController::turnOn() {
     if (_master && !_master->isOn()) {
         log_w("Pump '%s' interlock blocked: '%s' not running", _name, _master->getName());
         return false;
+    }
+
+    // Filter pre-run delay: master must have been running for _filterPreRunDelayMs
+    if (_master && _filterPreRunDelayMs > 0) {
+        unsigned long masterLastOn = _master->getLastOnTime();
+        if (masterLastOn > 0) {
+            unsigned long masterOnDuration = millis() - masterLastOn;
+            if (masterOnDuration < _filterPreRunDelayMs) {
+                unsigned long remaining = (_filterPreRunDelayMs - masterOnDuration) / 1000;
+                log_w("Pump '%s' waiting for filter pre-run: %lu sec remaining (need %lu sec total)",
+                      _name, remaining, _filterPreRunDelayMs / 1000);
+                return false;
+            }
+        }
     }
 
     unsigned long now = millis();
@@ -140,6 +155,11 @@ void PumpController::setMinOnTime(unsigned long ms) {
 
 void PumpController::setMinOffTime(unsigned long ms) {
     _minOffTimeMs = ms;
+}
+
+void PumpController::setFilterPreRunDelay(unsigned long ms) {
+    _filterPreRunDelayMs = ms;
+    log_i("Pump '%s' filter pre-run delay set to %lu ms", _name, ms);
 }
 
 void PumpController::addDependent(PumpController* dep) {
