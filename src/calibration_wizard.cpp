@@ -1,5 +1,6 @@
-// Calibration Wizard — state machine, stability detection, API handlers
-// Included by main.cpp
+// Calibration Wizard — included by main.cpp (NOT compiled separately)
+// All globals (sensorManager, calibrationData, webServer, calState, etc.)
+// are declared in main.cpp before this #include.
 
 enum CalState { CAL_IDLE, CAL_PH_WAIT_7, CAL_PH_LOCKED_7, CAL_PH_WAIT_4, CAL_PH_LOCKED_4, CAL_ORP_WAIT, CAL_ORP_LOCKED };
 static CalState calState = CAL_IDLE;
@@ -46,12 +47,12 @@ void handleCalStatus() {
     StaticJsonDocument<256> doc;
     doc["state"] = (int)calState;
     PHSensor* ph = sensorManager ? sensorManager->getPHSensor() : nullptr;
-    ORPSensor* orp = sensorManager ? sensorManager->getORPSensor() : nullptr;
+    ORPSensor* orpPtr = sensorManager ? sensorManager->getORPSensor() : nullptr;
     float rawV = 0.0f, rawMV = 0.0f;
     if (calState == CAL_PH_WAIT_7 || calState == CAL_PH_WAIT_4) {
         if (ph && ph->isConnected()) { rawV = ph->readRawVoltage(); calPushVoltage(rawV); }
     } else if (calState == CAL_ORP_WAIT) {
-        if (orp && orp->isConnected()) { rawV = orp->readRawVoltage(); rawMV = orp->readRawMV(); calPushVoltage(rawV); }
+        if (orpPtr && orpPtr->isConnected()) { rawV = orpPtr->readRawVoltage(); rawMV = orpPtr->readRawMV(); calPushVoltage(rawV); }
     }
     doc["voltageV"] = rawV;
     doc["voltageMV"] = (calState == CAL_ORP_WAIT) ? rawMV : ((rawV / 4.096f) * 1000.0f);
@@ -98,18 +99,18 @@ void handleCalLockPH4() {
 }
 
 void handleCalStartORP() {
-    ORPSensor* orp = sensorManager ? sensorManager->getORPSensor() : nullptr;
-    if (!orp || !orp->isConnected()) { webServer.send(400, "application/json", "{\"error\":\"ORP sensor not connected\"}"); return; }
+    ORPSensor* orpPtr = sensorManager ? sensorManager->getORPSensor() : nullptr;
+    if (!orpPtr || !orpPtr->isConnected()) { webServer.send(400, "application/json", "{\"error\":\"ORP sensor not connected\"}"); return; }
     calState = CAL_ORP_WAIT; calResetWindow();
     webServer.send(200, "application/json", "{\"ok\":true}");
 }
 
 void handleCalLockORP() {
-    ORPSensor* orp = sensorManager ? sensorManager->getORPSensor() : nullptr;
-    if (!orp) { webServer.send(400, "application/json", "{\"error\":\"no sensor\"}"); return; }
+    ORPSensor* orpPtr = sensorManager ? sensorManager->getORPSensor() : nullptr;
+    if (!orpPtr) { webServer.send(400, "application/json", "{\"error\":\"no sensor\"}"); return; }
     if (webServer.hasArg("ref")) { float ref = webServer.arg("ref").toFloat(); if (ref >= 100 && ref <= 900) calORPRequiredMV = ref; }
-    orp->setCalibration(calORPRequiredMV);
-    orp->saveCalibration(calibrationData);
+    orpPtr->setCalibration(calORPRequiredMV);
+    orpPtr->saveCalibration(calibrationData);
     calibrationData.save();
     calState = CAL_ORP_LOCKED; calResetWindow();
     StaticJsonDocument<64> doc;
@@ -123,9 +124,9 @@ void handleCalReset() {
     if (!cancelOnly) {
         calibrationData = CalibrationData(); calibrationData.save();
         PHSensor* ph = sensorManager ? sensorManager->getPHSensor() : nullptr;
-        ORPSensor* orp = sensorManager ? sensorManager->getORPSensor() : nullptr;
+        ORPSensor* orpPtr = sensorManager ? sensorManager->getORPSensor() : nullptr;
         if (ph) ph->loadCalibration(calibrationData);
-        if (orp) orp->loadCalibration(calibrationData);
+        if (orpPtr) orpPtr->loadCalibration(calibrationData);
     }
     webServer.send(200, "application/json", "{\"ok\":true}");
 }

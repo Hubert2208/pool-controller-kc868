@@ -4,7 +4,6 @@ MQTTManager* MQTTManager::_instance = nullptr;
 
 #define MQTT_RECONNECT_BASE_DELAY 1000
 #define MQTT_RECONNECT_MAX_DELAY 30000
-#define MQTT_PUBLISH_INTERVAL_MS 30000
 
 MQTTManager::MQTTManager(ConfigManager& config)
     : _config(config)
@@ -25,17 +24,16 @@ void MQTTManager::begin() {
     _client.setServer(cfg.mqtt.broker.c_str(), cfg.mqtt.port);
     _client.setCallback(mqttCallback);
     _client.setBufferSize(1024);
-    log_i("MQTT: broker=%s:%d, base=%s, client=%s", cfg.mqtt.broker.c_str(), cfg.mqtt.port, _baseTopic.c_str(), cfg.mqtt.clientId.c_str());
+    log_i("MQTT: broker=%s:%d, base=%s", cfg.mqtt.broker.c_str(), cfg.mqtt.port, _baseTopic.c_str());
 }
 
 void MQTTManager::loop() {
     if (!_client.connected()) {
         unsigned long now = millis();
-        unsigned long delaySinceAttempt = now - _lastReconnectAttempt;
-        if (delaySinceAttempt >= (unsigned long)_reconnectDelay) {
+        if (now - _lastReconnectAttempt >= (unsigned long)_reconnectDelay) {
             _lastReconnectAttempt = now;
             if (connect()) { _reconnectDelay = MQTT_RECONNECT_BASE_DELAY; _discoveryPublished = false; }
-            else { _reconnectDelay = min((int)(_reconnectDelay * 1.5f), MQTT_RECONNECT_MAX_DELAY); log_w("MQTT reconnect failed"); }
+            else { _reconnectDelay = min((int)(_reconnectDelay * 1.5f), MQTT_RECONNECT_MAX_DELAY); }
         }
     } else { _client.loop(); }
 }
@@ -45,26 +43,23 @@ bool MQTTManager::connect() {
     StaticJsonDocument<64> lwtDoc;
     lwtDoc["state"] = "offline"; lwtDoc["client"] = cfg.mqtt.clientId.c_str();
     String lwtPayload; serializeJson(lwtDoc, lwtPayload);
-    bool connected = false;
-    if (cfg.mqtt.username.length() > 0) {
-        connected = _client.connect(cfg.mqtt.clientId.c_str(), cfg.mqtt.username.c_str(), cfg.mqtt.password.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
-    } else {
-        connected = _client.connect(cfg.mqtt.clientId.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
-    }
-    if (connected) { log_i("MQTT connected"); publishOnline(); subscribeCommands(); publishDiscovery(); return true; }
-    log_e("MQTT connect failed, rc=%d", _client.state()); return false;
+    bool ok = false;
+    if (cfg.mqtt.username.length() > 0)
+        ok = _client.connect(cfg.mqtt.clientId.c_str(), cfg.mqtt.username.c_str(), cfg.mqtt.password.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
+    else
+        ok = _client.connect(cfg.mqtt.clientId.c_str(), _lwtTopic.c_str(), 1, true, lwtPayload.c_str());
+    if (ok) { log_i("MQTT connected"); publishOnline(); subscribeCommands(); publishDiscovery(); return true; }
+    return false;
 }
 
 void MQTTManager::subscribeCommands() {
-    String cmdTopic = _baseTopic + "/command/#";
-    _client.subscribe(cmdTopic.c_str(), 1);
+    _client.subscribe((_baseTopic + "/command/#").c_str(), 1);
     _client.subscribe((_baseTopic + "/config/set").c_str(), 1);
 }
 
 bool MQTTManager::publish(const char* topicSuffix, const String& payload, bool retained) {
     if (!_client.connected()) return false;
-    String fullTopic = _baseTopic + "/" + topicSuffix;
-    return _client.publish(fullTopic.c_str(), payload.c_str(), retained);
+    return _client.publish((_baseTopic + "/" + topicSuffix).c_str(), payload.c_str(), retained);
 }
 
 void MQTTManager::publishOnline() {
@@ -86,7 +81,7 @@ void MQTTManager::publishDiscovery() {
     };
     char tb[256]; String p;
 
-    // Core sensors
+    // Core sensors (5)
     snprintf(tb,sizeof(tb),"%s",dt("sensor","ph").c_str());
     p = "{\"device_class\":\"pH\",\"name\":\"Pool pH\",\"state_class\":\"measurement\",\"state_topic\":\""+_baseTopic+"/ph\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_ph\"}";
     _client.publish(tb,p.c_str(),true);
@@ -107,7 +102,7 @@ void MQTTManager::publishDiscovery() {
     p = "{\"device_class\":\"pressure\",\"name\":\"Filter Pressure\",\"unit_of_measurement\":\"bar\",\"state_topic\":\""+_baseTopic+"/sensors\",\"value_template\":\"{{ value_json.filter_pressure.value }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_fp\"}";
     _client.publish(tb,p.c_str(),true);
 
-    // Chemistry
+    // Chemistry (4)
     snprintf(tb,sizeof(tb),"%s",dt("sensor","ph_pid_output").c_str());
     p = "{\"name\":\"pH PID Output\",\"unit_of_measurement\":\"%\",\"state_topic\":\""+_baseTopic+"/chemistry\",\"value_template\":\"{{ value_json.ph.pid_output }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phpo\"}";
     _client.publish(tb,p.c_str(),true);
@@ -132,33 +127,68 @@ void MQTTManager::publishDiscovery() {
     p = "{\"name\":\"ORP Setpoint\",\"unit_of_measurement\":\"mV\",\"state_topic\":\""+_baseTopic+"/chemistry\",\"value_template\":\"{{ value_json.chlorine.setpoint }}\",\"command_topic\":\""+_baseTopic+"/command/orp_setpoint\",\"min\":200,\"max\":900,\"step\":10,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_orsp\"}";
     _client.publish(tb,p.c_str(),true);
 
-    // Filter
+    // Filter (1)
     snprintf(tb,sizeof(tb),"%s",dt("sensor","filter_required").c_str());
     p = "{\"name\":\"Required Filter Runtime\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/filter\",\"value_template\":\"{{ value_json.required_runtime_min }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_frt\"}";
     _client.publish(tb,p.c_str(),true);
 
-    // Pump runtime
-    for (auto [suffix, name, uid] : {std::tuple{"ph_pump_runtime","pH Pump Runtime","_phrt"},{"cl_pump_runtime","Chlorine Pump Runtime","_clrt"},{"filter_pump_runtime","Filter Pump Runtime","_firt"}}) {
-        snprintf(tb,sizeof(tb),"%s",dt("sensor",suffix).c_str());
-        p = "{\"name\":\""+String(name)+"\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pumps\",\"value_template\":\"{{ value_json."+String(suffix).substring(0,strlen(suffix)-8)+"_pump.runtime_today_min }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+uid+"\"}";
-        _client.publish(tb,p.c_str(),true);
-    }
+    // Pump runtime (3)
+    snprintf(tb,sizeof(tb),"%s",dt("sensor","ph_pump_runtime").c_str());
+    p = "{\"name\":\"pH Pump Runtime Today\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pumps\",\"value_template\":\"{{ value_json.ph_pump.runtime_today_min }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phrt\"}";
+    _client.publish(tb,p.c_str(),true);
 
-    // Pump timing + daily limits + pre-run delay
-    for (auto [s,f,u,lo,hi] : {std::tuple{"Min ON","minOn",1,3600},{"Min OFF","minOff",1,7200},{"Max Daily","maxDailyMin",1,1440}}) {
-        for (auto [prefix,name,uid] : {std::tuple{"ph_","pH","_ph"},{"cl_","Chlorine","_cl"},{"filter_","Filter","_fi"}}) {
-            snprintf(tb,sizeof(tb),"%s",dt("number",String(prefix)+"pump_"+String(f=="Min ON"?"min_on":f=="Min OFF"?"min_off":"max_day")).c_str());
-            p = "{\"name\":\""+String(name)+" Pump "+String(s)+"\",\"unit_of_measurement\":\""+String(f=="maxDailyMin"?"min":"s")+"\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json."+String(prefix.substring(0,prefix.length()-1))+"."+String(f)+"}}\",\"command_topic\":\""+_baseTopic+"/command/"+String(prefix)+"pump_"+String(f=="minOn"?"min_on":f=="minOff"?"min_off":"max_day")+"\",\"min\":"+String(lo)+",\"max\":"+String(hi)+",\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+uid+"\"}";
-            _client.publish(tb,p.c_str(),true);
-        }
-    }
+    snprintf(tb,sizeof(tb),"%s",dt("sensor","cl_pump_runtime").c_str());
+    p = "{\"name\":\"Chlorine Pump Runtime Today\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pumps\",\"value_template\":\"{{ value_json.chlorine_pump.runtime_today_min }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_clrt\"}";
+    _client.publish(tb,p.c_str(),true);
 
-    // Filter pre-run delay
+    snprintf(tb,sizeof(tb),"%s",dt("sensor","filter_pump_runtime").c_str());
+    p = "{\"name\":\"Filter Pump Runtime Today\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pumps\",\"value_template\":\"{{ value_json.filter_pump.runtime_today_min }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_firt\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    // Pump timing: min on/off (6)
+    snprintf(tb,sizeof(tb),"%s",dt("number","ph_pump_min_on").c_str());
+    p = "{\"name\":\"pH Pump Min ON\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.ph.minOn }}\",\"command_topic\":\""+_baseTopic+"/command/ph_pump_min_on\",\"min\":1,\"max\":3600,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phmno\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","ph_pump_min_off").c_str());
+    p = "{\"name\":\"pH Pump Min OFF\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.ph.minOff }}\",\"command_topic\":\""+_baseTopic+"/command/ph_pump_min_off\",\"min\":1,\"max\":7200,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phmfo\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","cl_pump_min_on").c_str());
+    p = "{\"name\":\"Chlorine Pump Min ON\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.chlorine.minOn }}\",\"command_topic\":\""+_baseTopic+"/command/cl_pump_min_on\",\"min\":1,\"max\":3600,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_clmno\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","cl_pump_min_off").c_str());
+    p = "{\"name\":\"Chlorine Pump Min OFF\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.chlorine.minOff }}\",\"command_topic\":\""+_baseTopic+"/command/cl_pump_min_off\",\"min\":1,\"max\":7200,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_clmfo\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","filter_pump_min_on").c_str());
+    p = "{\"name\":\"Filter Pump Min ON\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.filter.minOn }}\",\"command_topic\":\""+_baseTopic+"/command/filter_pump_min_on\",\"min\":1,\"max\":3600,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_fimno\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","filter_pump_min_off").c_str());
+    p = "{\"name\":\"Filter Pump Min OFF\",\"unit_of_measurement\":\"s\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.filter.minOff }}\",\"command_topic\":\""+_baseTopic+"/command/filter_pump_min_off\",\"min\":1,\"max\":7200,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_fimfo\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    // Daily limits (3)
+    snprintf(tb,sizeof(tb),"%s",dt("number","ph_pump_max_day").c_str());
+    p = "{\"name\":\"pH Pump Max Daily\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.ph.maxDailyMin }}\",\"command_topic\":\""+_baseTopic+"/command/ph_pump_max_day\",\"min\":1,\"max\":1440,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phmdr\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","cl_pump_max_day").c_str());
+    p = "{\"name\":\"Chlorine Pump Max Daily\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.chlorine.maxDailyMin }}\",\"command_topic\":\""+_baseTopic+"/command/cl_pump_max_day\",\"min\":1,\"max\":1440,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_clmdr\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    snprintf(tb,sizeof(tb),"%s",dt("number","filter_pump_max_day").c_str());
+    p = "{\"name\":\"Filter Pump Max Daily\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.filter.maxDailyMin }}\",\"command_topic\":\""+_baseTopic+"/command/filter_pump_max_day\",\"min\":1,\"max\":1440,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_fimdr\"}";
+    _client.publish(tb,p.c_str(),true);
+
+    // Filter pre-run delay (1)
     snprintf(tb,sizeof(tb),"%s",dt("number","filter_prerun_delay").c_str());
     p = "{\"name\":\"Filter Pre-Run Delay\",\"unit_of_measurement\":\"min\",\"state_topic\":\""+_baseTopic+"/pump_config\",\"value_template\":\"{{ value_json.filter.preRunDelay }}\",\"command_topic\":\""+_baseTopic+"/command/filter_prerun_delay\",\"min\":1,\"max\":60,\"step\":1,\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_fprd\"}";
     _client.publish(tb,p.c_str(),true);
 
-    // ── Calibration sensors ──
+    // Calibration age sensors (2)
     snprintf(tb,sizeof(tb),"%s",dt("sensor","ph_calibration_days").c_str());
     p = "{\"name\":\"pH Calibration Age\",\"unit_of_measurement\":\"days\",\"state_class\":\"measurement\",\"state_topic\":\""+_baseTopic+"/calibration\",\"value_template\":\"{{ ((as_timestamp(now()) - value_json.ph.calibratedAt) / 86400) | round(0) if value_json.ph.calibratedAt is defined else -1 }}\",\"device\":"+d+",\"unique_id\":\""+cfg.mqtt.clientId+"_phcd\"}";
     _client.publish(tb,p.c_str(),true);
