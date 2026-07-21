@@ -147,6 +147,7 @@ String FilterPumpConfig::toJson() const {
     doc["maxDailyRuntimeMin"] = maxDailyRuntimeMin;
     doc["minOnTimeSec"] = minOnTimeSec;
     doc["minOffTimeSec"] = minOffTimeSec;
+    doc["filterPreRunDelayMin"] = filterPreRunDelayMin;
     String out;
     serializeJson(doc, out);
     return out;
@@ -163,6 +164,7 @@ FilterPumpConfig FilterPumpConfig::fromJson(JsonVariantConst json) {
         f.maxDailyRuntimeMin = json["maxDailyRuntimeMin"] | f.maxDailyRuntimeMin;
         f.minOnTimeSec = json["minOnTimeSec"] | f.minOnTimeSec;
         f.minOffTimeSec = json["minOffTimeSec"] | f.minOffTimeSec;
+        f.filterPreRunDelayMin = json["filterPreRunDelayMin"] | f.filterPreRunDelayMin;
     }
     return f;
 }
@@ -293,6 +295,7 @@ String AppConfig::toJson() const {
     fp["maxDailyRuntimeMin"] = filterPump.maxDailyRuntimeMin;
     fp["minOnTimeSec"] = filterPump.minOnTimeSec;
     fp["minOffTimeSec"] = filterPump.minOffTimeSec;
+    fp["filterPreRunDelayMin"] = filterPump.filterPreRunDelayMin;
 
     JsonArray relaysArr = doc.createNestedArray("relays");
     for (int i = 0; i < relayCount; i++) {
@@ -506,6 +509,7 @@ bool ConfigManager::updateFromJson(const String& json) {
         if (o["maxDailyRuntimeMin"].is<float>()) current.filterPump.maxDailyRuntimeMin = o["maxDailyRuntimeMin"];
         if (o["minOnTimeSec"].is<int>()) current.filterPump.minOnTimeSec = o["minOnTimeSec"];
         if (o["minOffTimeSec"].is<int>()) current.filterPump.minOffTimeSec = o["minOffTimeSec"];
+        if (o["filterPreRunDelayMin"].is<int>()) current.filterPump.filterPreRunDelayMin = o["filterPreRunDelayMin"];
     }
 
     if (doc["relayCount"].is<int>()) current.relayCount = doc["relayCount"];

@@ -110,6 +110,7 @@ inline void apply(AppConfig& cfg) {
     cfg.filterPump.minCycleMinutes    = 60;     // kürzester Zyklus
     cfg.filterPump.maxCycleMinutes    = 480;    // längster Zyklus
     cfg.filterPump.maxDailyRuntimeMin = 720;    // Tageslimit: 12h
+    cfg.filterPump.filterPreRunDelayMin = 5;    // Filter-Vorlauf: 5 min bevor Chemie-Pumpen starten
 
     // ═══════════════════════════════════════════════════════════════════
     //  PID-REGLER

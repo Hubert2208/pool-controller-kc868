@@ -24,6 +24,7 @@ public:
 
     void setMinOnTime(unsigned long ms);
     void setMinOffTime(unsigned long ms);
+    void setFilterPreRunDelay(unsigned long ms);  // Min. Zeit die Master-Pumpe laufen muss
     void resetDailyRuntime() const;
 
     // Dependents: pumps that may only run when this pump is running.
@@ -33,6 +34,7 @@ public:
 
     const char* getName() const { return _name; }
     uint8_t getRelayChannel() const { return _relayChannel; }
+    unsigned long getLastOnTime() const { return _lastOnTime; }  // When this pump last turned ON
 
 private:
     RelayManager& _relayManager;
@@ -41,6 +43,7 @@ private:
 
     unsigned long _minOnTimeMs;
     unsigned long _minOffTimeMs;
+    unsigned long _filterPreRunDelayMs;  // Only checked when _master is set (chemistry pumps)
     unsigned long _lastOnTime;
     unsigned long _lastOffTime;
     unsigned long _cycleStartTime;

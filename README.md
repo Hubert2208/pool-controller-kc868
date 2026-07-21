@@ -8,10 +8,11 @@ Intelligent pool water chemistry and filtration controller based on ESP32.
 - **PID Control**: pH and ORP-based chlorine dosing
 - **Sensor Support**: pH probe, ORP probe, DS18B20 water temp, DS18B20 air temp, pressure sensor
 - **Sensor Simulation**: Automatic fallback with pump-aware drift when real sensors are missing
-- **MQTT/HA**: Home Assistant auto-discovery via MQTT (21 entities)
+- **MQTT/HA**: Home Assistant auto-discovery via MQTT (25 entities)
 - **Config via LittleFS**: JSON config stored in flash (ArduinoJson 6.x)
 - **WiFi AP Fallback**: Configurable fallback access point
 - **Web Dashboard**: Status page on port 80
+- **Filter Pre-Run Delay**: Chemistry pumps (pH/Chlorine) wait for filter pump to run for a configurable time (1–60 min) before dosing — prevents chemical dosing into still water
 
 ## Hardware: KC868-A8
 
@@ -81,7 +82,7 @@ pool-controller/
 | `pool/chemistry` | Out | PID state, setpoints, enabled |
 | `pool/filter` | Out | Filter pump state, required runtime |
 | `pool/pumps` | Out | Dosing pump runtime stats |
-| `pool/pump_config` | Out | Pump anti-short-cycle timing config (JSON) |
+| `pool/pump_config` | Out | Pump timing config incl. pre-run delay (JSON) |
 | `pool/ph` | Out | Raw pH value (dedicated topic) |
 | `pool/command/ph_setpoint` | In | Set pH target (6.0-8.0) |
 | `pool/command/orp_setpoint` | In | Set ORP target (200-900mV) |
@@ -90,8 +91,9 @@ pool-controller/
 | `pool/command/all_off` | In | Emergency all relays off |
 | `pool/command/reset_config` | In | Reset to defaults (send 'confirm') |
 | `pool/command/restart` | In | ESP32 restart (send 'confirm') |
-| `pool/command/pump_timing` | In | Bulk pump timing config (JSON) |
+| `pool/command/pump_timing` | In | Bulk pump timing config (JSON, incl. preRunDelay) |
 | `pool/command/*_pump_min_on/off` | In | Individual pump timing settings |
+| `pool/command/filter_prerun_delay` | In | Filter pre-run delay (1–60 min) |
 | `pool/config/set` | In | Update config JSON at runtime |
 
 ## Building & Flashing

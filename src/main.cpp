@@ -93,6 +93,7 @@ void handleRoot() {
     html += ".pt-row{margin:4px 0;font-size:0.85em}";
     html += ".pt-label{display:inline-block;width:70px}";
     html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center}";
+    html += ".pt-note{color:#888;font-size:0.73em;margin:2px 0 6px 0}";
     html += "</style></head><body><h1>🏊 Pool Controller</h1>";
     html += "<div class='card'><h2>System</h2>";
     html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
@@ -120,6 +121,11 @@ void handleRoot() {
     html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec, cfg.phPump.maxDailyRuntimeMin);
     html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec, cfg.chlorinePump.maxDailyRuntimeMin);
     html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec, cfg.filterPump.maxDailyRuntimeMin);
+    // ── Filter pre-run delay ──
+    html += "<div class='pt-row'><span class='pt-label'>🔒 Pre-Run:</span>";
+    html += " Filter must run <input type='number' class='pt-input' style='width:55px' id='ptd-prerun' value='" + String(cfg.filterPump.filterPreRunDelayMin) + "' min='1' max='60' step='1'> min before pH/Cl pumps start";
+    html += "</div>";
+    html += "<p class='pt-note'>⚠️ Chemistry pumps wait for filter pre-run delay after each filter restart.</p>";
     html += "<button class='sp-apply' onclick=\"applyPumpTiming(event)\">Apply Timing</button><span class='sp-saved' id='pt-saved'>✅ Saved!</span>";
     html += "</div>";
     html += "<div class='card'><h2>Control Mode</h2><p>";
@@ -140,7 +146,7 @@ void handleRoot() {
     html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
     html += "<script>";
     html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff+'&ph_day='+document.getElementById('ptd-ph').value+'&cl_day='+document.getElementById('ptd-cl').value+'&filter_day='+document.getElementById('ptd-filter').value).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
+    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff+'&ph_day='+document.getElementById('ptd-ph').value+'&cl_day='+document.getElementById('ptd-cl').value+'&filter_day='+document.getElementById('ptd-filter').value+'&filter_prerun='+document.getElementById('ptd-prerun').value).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
     html += "</script>";
     html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
     webServer.send(200, "text/html", html);
@@ -226,6 +232,8 @@ void handleAPIPumpTiming() {
     if (webServer.hasArg("ph_day")) { float v = webServer.arg("ph_day").toFloat(); if (applyDaily(v, cfg.phPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
     if (webServer.hasArg("cl_day")) { float v = webServer.arg("cl_day").toFloat(); if (applyDaily(v, cfg.chlorinePump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
     if (webServer.hasArg("filter_day")) { float v = webServer.arg("filter_day").toFloat(); if (applyDaily(v, cfg.filterPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
+    // ── Filter pre-run delay ──
+    if (webServer.hasArg("filter_prerun")) { int v = webServer.arg("filter_prerun").toInt(); if (applyTiming(v, cfg.filterPump.filterPreRunDelayMin, 1, 60)) changed = true; }
 
     if (changed) {
         configManager.save();
@@ -260,19 +268,22 @@ void applyPumpConfig() {
     if (phPumpCtrl) {
         phPumpCtrl->setMinOnTime((unsigned long)(cfg.phPump.minOnTimeSec * 1000));
         phPumpCtrl->setMinOffTime((unsigned long)(cfg.phPump.minOffTimeSec * 1000));
+        phPumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin * 60000));
     }
     if (chlorinePumpCtrl) {
         chlorinePumpCtrl->setMinOnTime((unsigned long)(cfg.chlorinePump.minOnTimeSec * 1000));
         chlorinePumpCtrl->setMinOffTime((unsigned long)(cfg.chlorinePump.minOffTimeSec * 1000));
+        chlorinePumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin * 60000));
     }
     if (filterPumpCtrl) {
         filterPumpCtrl->setMinOnTime((unsigned long)(cfg.filterPump.minOnTimeSec * 1000));
         filterPumpCtrl->setMinOffTime((unsigned long)(cfg.filterPump.minOffTimeSec * 1000));
     }
-    log_i("Pump timing applied: pH=%d/%ds Cl=%d/%ds Filter=%d/%ds",
+    log_i("Pump timing applied: pH=%d/%ds Cl=%d/%ds Filter=%d/%ds PreRunDelay=%dmin",
           cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec,
           cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec,
-          cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec);
+          cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec,
+          cfg.filterPump.filterPreRunDelayMin);
 }
 
 void handleMQTTCommand(const char* topic, const String& payload) {
@@ -295,9 +306,10 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     else if (t == base + "ph_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.phPump.maxDailyRuntimeMin = v; configManager.save(); } }
     else if (t == base + "cl_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.chlorinePump.maxDailyRuntimeMin = v; configManager.save(); } }
     else if (t == base + "filter_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.filterPump.maxDailyRuntimeMin = v; configManager.save(); } }
+    // ── Filter pre-run delay ──
+    else if (t == base + "filter_prerun_delay") { int v = payload.toInt(); if (v >= 1 && v <= 60) { cfg.filterPump.filterPreRunDelayMin = v; configManager.save(); applyPumpConfig(); log_i("MQTT: filter pre-run delay set to %d min", v); } }
     // ── Bulk pump timing (JSON) ──
     else if (t == base + "pump_timing") {
-        // JSON payload: {"ph":{"minOn":30,"minOff":120},"chlorine":{"minOn":30,"minOff":120},"filter":{"minOn":60,"minOff":300}}
         StaticJsonDocument<256> doc;
         if (deserializeJson(doc, payload) == DeserializationError::Ok) {
             if (doc["ph"]["minOn"].is<int>()) cfg.phPump.minOnTimeSec = doc["ph"]["minOn"];
@@ -306,6 +318,7 @@ void handleMQTTCommand(const char* topic, const String& payload) {
             if (doc["chlorine"]["minOff"].is<int>()) cfg.chlorinePump.minOffTimeSec = doc["chlorine"]["minOff"];
             if (doc["filter"]["minOn"].is<int>()) cfg.filterPump.minOnTimeSec = doc["filter"]["minOn"];
             if (doc["filter"]["minOff"].is<int>()) cfg.filterPump.minOffTimeSec = doc["filter"]["minOff"];
+            if (doc["filter"]["preRunDelay"].is<int>()) cfg.filterPump.filterPreRunDelayMin = doc["filter"]["preRunDelay"];
             configManager.save();
             applyPumpConfig();
             log_i("MQTT: pump timing updated");
@@ -413,19 +426,20 @@ void loop() {
             mqttManager->publish("pumps", pumpStates, false);
 
             // Pump timing config state (for HA autodiscovery number entities)
-            StaticJsonDocument<128> timingDoc;
+            StaticJsonDocument<192> timingDoc;
             JsonObject tph = timingDoc.createNestedObject("ph");
             tph["minOn"] = cfg.phPump.minOnTimeSec;
             tph["minOff"] = cfg.phPump.minOffTimeSec;
+            tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
             JsonObject tcl = timingDoc.createNestedObject("chlorine");
             tcl["minOn"] = cfg.chlorinePump.minOnTimeSec;
             tcl["minOff"] = cfg.chlorinePump.minOffTimeSec;
+            tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
             JsonObject tf = timingDoc.createNestedObject("filter");
             tf["minOn"] = cfg.filterPump.minOnTimeSec;
             tf["minOff"] = cfg.filterPump.minOffTimeSec;
             tf["maxDailyMin"] = cfg.filterPump.maxDailyRuntimeMin;
-            tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
-            tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
+            tf["preRunDelay"] = cfg.filterPump.filterPreRunDelayMin;
             String timingJson;
             serializeJson(timingDoc, timingJson);
             mqttManager->publish("pump_config", timingJson, false);
