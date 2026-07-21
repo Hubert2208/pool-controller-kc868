@@ -360,8 +360,20 @@ void MQTTManager::publishDiscovery() {
               "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fimdr\"}";
     _client.publish(topicBuf, payload.c_str(), true);
 
+    // ── Filter Pre-Run Delay number entity ──
+    // State on pool/pump_config filter.preRunDelay, command on pool/command/filter_prerun_delay
+
+    snprintf(topicBuf, sizeof(topicBuf), "%s", discoveryTopic("number", "filter_prerun_delay").c_str());
+    payload = "{\"name\":\"Filter Pre-Run Delay\",\"unit_of_measurement\":\"min\","
+              "\"state_topic\":\"" + _baseTopic + "/pump_config\","
+              "\"value_template\":\"{{ value_json.filter.preRunDelay }}\","
+              "\"command_topic\":\"" + _baseTopic + "/command/filter_prerun_delay\","
+              "\"min\":1,\"max\":60,\"step\":1,"
+              "\"device\":" + deviceStr + ",\"unique_id\":\"" + cfg.mqtt.clientId + "_fprd\"}";
+    _client.publish(topicBuf, payload.c_str(), true);
+
     _discoveryPublished = true;
-    log_i("HA discovery published (24 entities)");
+    log_i("HA discovery published (25 entities)");
 }
 
 void MQTTManager::mqttCallback(char* topic, byte* payload, unsigned int length) {
