@@ -34,10 +34,7 @@ static unsigned long lastSensorPublish = 0;
 static const unsigned long SENSOR_PUBLISH_INTERVAL = 30000;
 static unsigned long wifiReconnectTime = 0;
 static bool wifiConnected = false;
-static bool ntpSynced = false;
 static bool systemReady = false;
-static unsigned long startTime = 0;
-static int watchdogCount = 0;
 static const char* WIFI_HOSTNAME = "pool-controller";
 static const char* AP_SSID = "PoolController-AP";
 static const char* AP_PASSWORD = "***";
@@ -304,7 +301,7 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     }
 }
 
-void feedWatchdog() { esp_task_wdt_reset(); watchdogCount++; }
+void feedWatchdog() { esp_task_wdt_reset(); }
 
 void setup() {
     Serial.begin(115200); delay(1000);
@@ -331,12 +328,12 @@ void setup() {
     setupWiFi(); setupWebServer();
 
     if (wifiConnected) {
-        ntpSynced = initNTP(7200, 3600);
-        ntpSynced = waitForNTPSync(15);
+        initNTP(7200, 3600);
+        waitForNTPSync(15);
     }
 
     mqttManager = new MQTTManager(configManager); mqttManager->begin(); mqttManager->setCommandCallback(handleMQTTCommand);
-    startTime = millis(); systemReady = true;
+    systemReady = true;
     log_i("═══ System ready (%lu ms) ═══", millis());
 }
 

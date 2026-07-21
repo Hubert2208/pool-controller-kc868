@@ -36,11 +36,8 @@ public:
 private:
     float _minVal;
     float _maxVal;
-    float _driftPerHour;
     float _currentValue;
-    float _target;
     unsigned long _lastUpdate;
-    unsigned long _seed;
 
     // Pump-aware simulation state
     bool _pumpActive = false;

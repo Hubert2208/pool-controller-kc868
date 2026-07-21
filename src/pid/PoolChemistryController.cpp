@@ -13,8 +13,6 @@ PoolChemistryController::PoolChemistryController(ConfigManager& config, SensorMa
     , _lastUpdate(0)
     , _lastPHCycleStart(0)
     , _lastChlorineCycleStart(0)
-    , _phOnDuration(0)
-    , _chlorineOnDuration(0)
 {
 }
 

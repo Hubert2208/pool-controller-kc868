@@ -96,8 +96,6 @@ struct PumpConfig {
 
 struct FilterPumpConfig {
     int relayChannel = 0;
-    float tempSlope = 8.0;
-    float tempIntercept = -40.0;
     String windowStart = "07:00";
     String windowEnd = "21:00";
     int minCycleMinutes = 60;

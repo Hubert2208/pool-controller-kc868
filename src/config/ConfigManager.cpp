@@ -140,8 +140,6 @@ PumpConfig PumpConfig::fromJson(JsonVariantConst json) {
 String FilterPumpConfig::toJson() const {
     StaticJsonDocument<256> doc;
     doc["relayChannel"] = relayChannel;
-    doc["tempSlope"] = tempSlope;
-    doc["tempIntercept"] = tempIntercept;
     doc["windowStart"] = windowStart;
     doc["windowEnd"] = windowEnd;
     doc["minCycleMinutes"] = minCycleMinutes;
@@ -158,8 +156,6 @@ FilterPumpConfig FilterPumpConfig::fromJson(JsonVariantConst json) {
     FilterPumpConfig f;
     if (json.is<JsonObjectConst>()) {
         f.relayChannel = json["relayChannel"] | f.relayChannel;
-        f.tempSlope = json["tempSlope"] | f.tempSlope;
-        f.tempIntercept = json["tempIntercept"] | f.tempIntercept;
         if (json["windowStart"].is<const char*>()) f.windowStart = json["windowStart"].as<const char*>();
         if (json["windowEnd"].is<const char*>()) f.windowEnd = json["windowEnd"].as<const char*>();
         f.minCycleMinutes = json["minCycleMinutes"] | f.minCycleMinutes;
@@ -290,8 +286,6 @@ String AppConfig::toJson() const {
 
     JsonObject fp = doc.createNestedObject("filterPump");
     fp["relayChannel"] = filterPump.relayChannel;
-    fp["tempSlope"] = filterPump.tempSlope;
-    fp["tempIntercept"] = filterPump.tempIntercept;
     fp["windowStart"] = filterPump.windowStart;
     fp["windowEnd"] = filterPump.windowEnd;
     fp["minCycleMinutes"] = filterPump.minCycleMinutes;
@@ -505,8 +499,6 @@ bool ConfigManager::updateFromJson(const String& json) {
     if (doc["filterPump"].is<JsonObject>()) {
         JsonObject o = doc["filterPump"];
         if (o["relayChannel"].is<int>()) current.filterPump.relayChannel = o["relayChannel"];
-        if (o["tempSlope"].is<float>()) current.filterPump.tempSlope = o["tempSlope"];
-        if (o["tempIntercept"].is<float>()) current.filterPump.tempIntercept = o["tempIntercept"];
         if (o["windowStart"].is<const char*>()) current.filterPump.windowStart = o["windowStart"].as<const char*>();
         if (o["windowEnd"].is<const char*>()) current.filterPump.windowEnd = o["windowEnd"].as<const char*>();
         if (o["minCycleMinutes"].is<int>()) current.filterPump.minCycleMinutes = o["minCycleMinutes"];
