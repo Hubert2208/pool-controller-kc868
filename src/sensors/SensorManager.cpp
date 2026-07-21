@@ -125,11 +125,7 @@ bool SensorManager::begin() {
     );
 
     // Configure pump-aware simulation drift rates
-    // pH: natural drift up (+0.15/h) -- pool pH rises without dosing
-    //     pump ON drops pH (-0.8/h) -- pH-minus dosing effect
     if (_phSim) _phSim->setPumpDriftRates(0.15f, -0.8f);
-    // ORP: natural decay (-8 mV/h) -- chlorine degrades without dosing
-    //      pump ON raises ORP (+40 mV/h) -- chlorine dosing effect
     if (_orpSim) _orpSim->setPumpDriftRates(-8.0f, 40.0f);
 
     log_i("Sensor manager initialized with %d real sensors + simulation fallbacks", _sensorCount);
@@ -140,8 +136,7 @@ void SensorManager::update() {
     AppConfig& cfg = _config.get();
     unsigned long now = millis();
 
-    // Round-robin through real sensors
-    if (_sensorCount > 0 && (now - _lastUpdate >= cfg.loopDelayMs)) {
+    if (_sensorCount > 0 && (now - _lastUpdate >= (unsigned long)cfg.loopDelayMs)) {
         SensorBase* s = _sensors[_currentSensorIndex];
         if (s->isEnabled()) {
             if (now - s->lastReadTime() >= (unsigned long)s->updateIntervalMs()) {
@@ -153,7 +148,6 @@ void SensorManager::update() {
         _lastUpdate = now;
     }
 
-    // Update simulation fallbacks
     if (_phSim) _phSim->update();
     if (_orpSim) _orpSim->update();
     if (_waterTempSim) _waterTempSim->update();
@@ -201,6 +195,14 @@ bool SensorManager::isORPConnected() const {
 
 bool SensorManager::isWaterTempConnected() const {
     return _waterTempSensor && _waterTempSensor->isConnected();
+}
+
+PHSensor* SensorManager::getPHSensor() const {
+    return static_cast<PHSensor*>(_phSensor);
+}
+
+ORPSensor* SensorManager::getORPSensor() const {
+    return static_cast<ORPSensor*>(_orpSensor);
 }
 
 void SensorManager::setPHPumpActive(bool active) {
