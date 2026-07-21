@@ -7,6 +7,8 @@ ORPSensor::ORPSensor(uint8_t adsAddress, uint8_t channel)
     : _adsAddress(adsAddress)
     , _channel(channel)
     , _calOffset(0.0f)
+    , _calReferenceMV(0.0f)
+    , _lastRawVoltage(0.0f)
 {
 }
 
@@ -18,12 +20,19 @@ bool ORPSensor::begin() {
     }
     _ads.setGain(GAIN_ONE);
     _ads.setDataRate(RATE_ADS1115_860SPS);
+
+    // Load persisted calibration
+    CalibrationData cal;
+    if (cal.load()) {
+        loadCalibration(cal);
+    }
+
     _connected = true;
-    log_i("ORP sensor initialized on ADS1115[%d]", _channel);
+    log_i("ORP sensor initialized on ADS1115[%d] (offset=%.1f mV)", _channel, _calOffset);
     return true;
 }
 
-float ORPSensor::readVoltage() {
+float ORPSensor::readRawVoltage() {
     if (!_connected) return 0.0f;
 
     int16_t raw = 0;
@@ -37,7 +46,14 @@ float ORPSensor::readVoltage() {
 
     float voltage = (raw / ADS1115_RESOLUTION) * ADS1115_MAX_VOLTAGE;
     voltage = max(0.0f, min(ADS1115_MAX_VOLTAGE, voltage));
+    _lastRawVoltage = voltage;
     return voltage;
+}
+
+float ORPSensor::readRawMV() {
+    // Raw mV before offset correction
+    float voltage = readRawVoltage();
+    return (voltage / ADS1115_MAX_VOLTAGE) * 1000.0f;
 }
 
 bool ORPSensor::read() {
@@ -50,8 +66,7 @@ bool ORPSensor::read() {
         if (!_connected) return false;
     }
 
-    float voltage = readVoltage();
-    // ORP probes typically output 0-2.5V corresponding to 0-1000mV ORP
+    float voltage = readRawVoltage();
     _value = (voltage / ADS1115_MAX_VOLTAGE) * 1000.0f + _calOffset;
 
     // Clamp to reasonable ORP range
@@ -62,10 +77,22 @@ bool ORPSensor::read() {
 }
 
 void ORPSensor::setCalibration(float knownORP_mV) {
-    // Read actual probe voltage and compute offset against known ORP value
-    float currentVoltage = readVoltage();
-    float measured_mV = (currentVoltage / ADS1115_MAX_VOLTAGE) * 1000.0f;
+    _calReferenceMV = knownORP_mV;
+    float measured_mV = readRawMV();
     _calOffset = knownORP_mV - measured_mV;
     log_i("ORP cal: known=%.1f mV, measured=%.1f mV, offset=%.1f mV",
           knownORP_mV, measured_mV, _calOffset);
+}
+
+void ORPSensor::loadCalibration(const CalibrationData& cal) {
+    _calOffset = cal.orpOffset;
+    _calReferenceMV = cal.orpReferenceMV;
+    log_i("ORP cal loaded: offset=%.1f mV (ref=%.1f mV)", _calOffset, _calReferenceMV);
+}
+
+void ORPSensor::saveCalibration(CalibrationData& cal) const {
+    cal.orpOffset = _calOffset;
+    cal.orpReferenceMV = _calReferenceMV;
+    time_t now = time(nullptr);
+    cal.orpCalibratedAt = (now > 100000) ? (unsigned long)now : millis() / 1000;
 }
