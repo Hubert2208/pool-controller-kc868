@@ -1,5 +1,5 @@
 /**
- * Pool Controller for ESP32 (Kincony KC868-A8)
+ * Pool Controller for ESP32 (Kincony KC868-A8) v1.1.0
  */
 
 #include <Arduino.h>
@@ -7,6 +7,8 @@
 #include <esp_task_wdt.h>
 #include "config/ConfigManager.h"
 #include "sensors/SensorManager.h"
+#include "sensors/PHSensor.h"
+#include "sensors/ORPSensor.h"
 #include "actuators/RelayManager.h"
 #include "actuators/PumpController.h"
 #include "pid/PoolChemistryController.h"
@@ -14,17 +16,15 @@
 #include "utils/TimingUtils.h"
 #include "mqtt/MQTTManager.h"
 
-void setupWiFi();
-void setupWebServer();
+void setupWiFi(); void setupWebServer();
 void handleMQTTCommand(const char* topic, const String& payload);
 void applyPumpConfig();
 
 ConfigManager configManager;
+CalibrationData calibrationData;
 RelayManager relayManager;
 SensorManager* sensorManager = nullptr;
-PumpController* phPumpCtrl = nullptr;
-PumpController* chlorinePumpCtrl = nullptr;
-PumpController* filterPumpCtrl = nullptr;
+PumpController *phPumpCtrl = nullptr, *chlorinePumpCtrl = nullptr, *filterPumpCtrl = nullptr;
 FilterPumpLogic* filterPumpLogic = nullptr;
 PoolChemistryController* chemistryController = nullptr;
 MQTTManager* mqttManager = nullptr;
@@ -33,125 +33,128 @@ static bool manualMode = false;
 static unsigned long lastSensorPublish = 0;
 static const unsigned long SENSOR_PUBLISH_INTERVAL = 30000;
 static unsigned long wifiReconnectTime = 0;
-static bool wifiConnected = false;
-static bool systemReady = false;
-static const char* WIFI_HOSTNAME = "pool-controller";
-static const char* AP_SSID = "PoolController-AP";
-static const char* AP_PASSWORD = "***";
-static const IPAddress AP_IP(192, 168, 4, 1);
-static const IPAddress AP_GATEWAY(192, 168, 4, 1);
-static const IPAddress AP_SUBNET(255, 255, 255, 0);
+static bool wifiConnected = false, systemReady = false;
+static const char *WIFI_HOSTNAME = "pool-controller", *AP_SSID = "PoolController-AP";
+static const IPAddress AP_IP(192,168,4,1), AP_GW(192,168,4,1), AP_SN(255,255,255,0);
 
 #include <WebServer.h>
 WebServer webServer(80);
+// Calibration state machine + API handlers (shared state with main)
+#include "calibration_wizard.cpp"
 
-String pumpButton(const char* id, const char* label, bool state, unsigned long runMins, unsigned long dayMins) {
-    String cls = state ? "btn-on" : "btn-off"; String txt = state ? "ON" : "OFF";
-    String out = "<span class='pump-label'>" + String(label) + ":</span> ";
-    out += "<button class='pump-btn " + cls + "' onclick=\"fetch('/api/pump/set?id=" + String(id) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">" + txt + "</button>";
-    out += " <span class='runtime'>(" + String(state ? String(runMins) : "0") + "m / " + String(dayMins) + "m today)</span>";
-    return out;
+// ── HTML helpers ──
+String pumpBtn(const char* id, const char* lb, bool st, unsigned long rm, unsigned long dm) {
+    String c = st ? "btn-on" : "btn-off", t = st ? "ON" : "OFF";
+    return "<span class='pl'>" + String(lb) + ":</span> <button class='pb " + c +
+        "' onclick=\"f('/api/pump/set?id=" + String(id) + "&state=" + String(st?0:1) + "')\">" + t +
+        "</button> <span class='rt'>(" + String(st?String(rm):"0") + "m/" + String(dm) + "m)</span>";
+}
+String rBtn(int ch, bool st) {
+    String c = st ? "btn-on" : "btn-off", t = st ? "ON" : "OFF";
+    return "<button class='rb " + c + "' onclick=\"f('/api/relay/set?channel=" + String(ch) +
+        "&state=" + String(st?0:1) + "')\">R" + String(ch) + ":" + t + "</button>";
+}
+String ptRow(const char* id, const char* lb, int on, int off, float dmax) {
+    String o = "<div class='pr'><span class='pl2'>" + String(lb) + ":</span>";
+    o += "ON<input class='pi' id='pon-"+String(id)+"' value='"+String(on)+"' min='1' max='3600'>s";
+    o += " OFF<input class='pi' id='pof-"+String(id)+"' value='"+String(off)+"' min='1' max='7200'>s";
+    o += " day<input class='pi' style='width:60px' id='pday-"+String(id)+"' value='"+String((int)dmax)+"' min='1' max='1440'>m</div>";
+    return o;
 }
 
-String relayButton(int channel, bool state) {
-    String cls = state ? "btn-on" : "btn-off"; String txt = state ? "ON" : "OFF";
-    return "<button class='relay-btn " + cls + "' onclick=\"fetch('/api/relay/set?channel=" + String(channel) + "&state=" + String(state ? 0 : 1) + "').then(r=>r.json()).then(d=>location.reload())\">R" + String(channel) + ": " + txt + "</button>";
-}
-
-String pumpTimingRow(const char* id, const char* label, int minOn, int minOff, float maxDailyMin) {
-    String out = "<div class='pt-row'><span class='pt-label'>" + String(label) + ":</span>";
-    out += " min ON <input type='number' class='pt-input' id='pto-" + String(id) + "' value='" + String(minOn) + "' min='1' max='3600' step='1'> sec";
-    out += " | min OFF <input type='number' class='pt-input' id='ptf-" + String(id) + "' value='" + String(minOff) + "' min='1' max='7200' step='1'> sec";
-    out += " | max/day <input type='number' class='pt-input' style='width:68px' id='ptd-" + String(id) + "' value='" + String((int)maxDailyMin) + "' min='1' max='1440' step='1'> min";
-    out += "</div>";
-    return out;
-}
-
+// ── Root page with calibration wizard ──
 void handleRoot() {
     AppConfig& cfg = configManager.get();
-    String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
-    html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<style>";
-    html += "body{font-family:Arial,sans-serif;margin:10px;background:#1a1a2e;color:#eee}";
-    html += "h1{color:#0f0;font-size:1.3em;margin:8px 0}h2{color:#0af;font-size:1em;margin:6px 0}";
-    html += ".card{background:#16213e;border-radius:8px;padding:12px;margin:8px 0}";
-    html += ".value{font-size:1.3em;font-weight:bold;color:#0f0}.bad{color:#f44}";
-    html += ".btn-on{background:#0a0;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
-    html += ".btn-off{background:#444;color:#ccc;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
-    html += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
-    html += ".relay-btn{font-size:0.75em;padding:4px 8px;margin:2px;min-width:52px}";
-    html += ".pump-label{display:inline-block;width:100px}.runtime{color:#888;font-size:0.75em;margin-left:6px}";
-    html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
-    html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
-    html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}.mode-btn.auto{background:#0a0}";
-    html += ".sp-label{display:inline-block;width:80px;text-align:right;margin-right:8px}";
-    html += ".sp-range{width:140px;margin:0 8px;vertical-align:middle}";
-    html += ".sp-val{display:inline-block;width:45px;color:#0f0;font-weight:bold}";
-    html += ".sp-apply{background:#0af;color:#000;border:none;padding:6px 20px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:8px}";
-    html += ".sp-apply:hover{background:#0cf}.sp-row{margin:4px 0}";
-    html += ".sp-saved{color:#0f0;font-size:0.8em;margin-left:10px;display:none}";
-    html += ".pt-row{margin:4px 0;font-size:0.85em}";
-    html += ".pt-label{display:inline-block;width:70px}";
-    html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center}";
-    html += ".pt-note{color:#888;font-size:0.73em;margin:2px 0 6px 0}";
-    html += "</style></head><body><h1>🏊 Pool Controller</h1>";
-    html += "<div class='card'><h2>System</h2>";
-    html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
-    html += "<p>Uptime: <span id='sys-uptime'>" + String(millis() / 1000 / 60) + "</span> min | WiFi: <span id='sys-wifi'>" + String(WiFi.isConnected() ? "✅" : "❌") + "</span> | MQTT: <span id='sys-mqtt'>" + String(mqttManager && mqttManager->isConnected() ? "✅" : "❌") + "</span> | IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p></div>";
-    html += "<div class='card'><h2>Sensors</h2><p>";
+    String h = "<!DOCTYPE html><html><head><title>Pool Ctrl</title><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>";
+    h += "body{font:14px Arial;margin:8px;background:#1a1a2e;color:#eee}h1{color:#0f0;font-size:1.2em}h2{color:#0af;font-size:1em}";
+    h += ".cd{background:#16213e;border-radius:8px;padding:10px;margin:6px 0}.v{font-size:1.2em;font-weight:bold;color:#0f0}.bd{color:#f44}.wn{color:#f80}";
+    h += ".btn-on{background:#0a0;color:#fff;border:none;padding:5px 14px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:56px}";
+    h += ".btn-off{background:#444;color:#ccc;border:none;padding:5px 14px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:56px}";
+    h += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
+    h += ".bc{background:#0af;color:#000;border:none;padding:5px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px 3px}";
+    h += ".bc:hover{background:#0cf}.bc.dg{background:#f44;color:#fff}.bc.dg:hover{background:#f66}.bc:disabled{opacity:0.4}";
+    h += ".rb{font-size:0.7em;padding:3px 6px;margin:1px;min-width:48px}.pl{display:inline-block;width:90px}.rt{color:#888;font-size:0.7em;margin-left:4px}";
+    h += ".mb{background:#f80;color:#000;padding:2px 6px;border-radius:4px;font-weight:bold;font-size:0.8em}";
+    h += ".ab{background:#0a0;color:#000;padding:2px 6px;border-radius:4px;font-weight:bold;font-size:0.8em}";
+    h += ".mode-btn{background:#f80;color:#000;border:none;padding:5px 14px;border-radius:4px;font-weight:bold;cursor:pointer}.mode-btn.auto{background:#0a0}";
+    h += ".sl{display:inline-block;width:75px;text-align:right;margin-right:6px}.sr{width:130px;margin:0 6px;vertical-align:middle}";
+    h += ".sv{display:inline-block;width:40px;color:#0f0;font-weight:bold}.ap{background:#0af;color:#000;border:none;padding:5px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:6px}";
+    h += ".ap:hover{background:#0cf}.sr2{margin:3px 0}.ok{color:#0f0;font-size:0.75em;margin-left:8px;display:none}";
+    h += ".pr{margin:3px 0;font-size:0.8em}.pl2{display:inline-block;width:65px}";
+    h += ".pi{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:1px 3px;border-radius:3px;width:50px;text-align:center}";
+    h += ".cs{font-size:0.85em;margin:3px 0}.cl{font-size:1.1em;font-weight:bold;color:#0ff}.cg{color:#0f0;font-weight:bold}";
+    h += "</style></head><body><h1>Pool Controller</h1>";
+    // System
+    h += "<div class='cd'><h2>System</h2><p>" + String(manualMode ? "<span class='mb'>MANUAL</span>" : "<span class='ab'>AUTO</span>");
+    h += " Up:" + String(millis()/60000) + "m W:" + String(WiFi.isConnected()?"OK":"FAIL") + " M:" + String(mqttManager&&mqttManager->isConnected()?"OK":"FAIL");
+    h += " IP:" + (WiFi.isConnected() ? WiFi.localIP().toString() : "AP") + "</p></div>";
+    // Sensors
+    h += "<div class='cd'><h2>Sensors</h2><p>";
     if (sensorManager) {
-        html += "pH: <span class='value' id='val-ph'>" + String(sensorManager->getPH(), 2) + "</span> pH";
-        html += sensorManager->isPHConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| ORP: <span class='value' id='val-orp'>" + String(sensorManager->getORP(), 0) + "</span> mV";
-        html += sensorManager->isORPConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| Water: <span class='value' id='val-water'>" + String(sensorManager->getWaterTemperature(), 1) + "</span>°C";
-        html += "| Air: <span class='value' id='val-air'>" + String(sensorManager->getAirTemperature(), 1) + "</span>°C";
-        html += "| Pressure: <span class='value' id='val-pressure'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
+        h += "pH:<span class='v'>" + String(sensorManager->getPH(),2) + "</span> " + String(sensorManager->isPHConnected()?"OK":"<span class='bd'>sim</span>");
+        h += " |ORP:<span class='v'>" + String(sensorManager->getORP(),0) + "</span>mV " + String(sensorManager->isORPConnected()?"OK":"<span class='bd'>sim</span>");
+        h += " |W:<span class='v'>" + String(sensorManager->getWaterTemperature(),1) + "</span>C";
+        h += " |A:<span class='v'>" + String(sensorManager->getAirTemperature(),1) + "</span>C |P:<span class='v'>" + String(sensorManager->getFilterPressure(),2) + "</span>bar";
     }
-    html += "</p></div>";
-    float phSP = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
-    float orpSP = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
-    html += "<div class='card'><h2>🎯 Chemistry Setpoints</h2>";
-    html += "<div class='sp-row'><span class='sp-label'>pH Target:</span><input type='range' class='sp-range' id='sp-ph-range' min='6.0' max='8.0' step='0.1' value='" + String(phSP, 1) + "' oninput=\"document.getElementById('sp-ph-val').textContent=this.value\"><span class='sp-val' id='sp-ph-val'>" + String(phSP, 1) + "</span> pH</div>";
-    html += "<div class='sp-row'><span class='sp-label'>ORP Target:</span><input type='range' class='sp-range' id='sp-orp-range' min='200' max='900' step='10' value='" + String((int)orpSP) + "' oninput=\"document.getElementById('sp-orp-val').textContent=this.value\"><span class='sp-val' id='sp-orp-val'>" + String((int)orpSP) + "</span> mV</div>";
-    html += "<button class='sp-apply' onclick=\"applySetpoints(event)\">Apply Setpoints</button><span class='sp-saved' id='sp-saved'>✅ Saved!</span>";
-    html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Changes take effect immediately.</p></div>";
-    html += "<div class='card'><h2>⏱️ Pump Timing (Anti-Short-Cycle)</h2>";
-    html += "<p style='font-size:0.75em;color:#888;margin:0 0 8px 0'>Pump won't start until min OFF time elapsed; won't stop until min ON time elapsed.</p>";
-    html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec, cfg.phPump.maxDailyRuntimeMin);
-    html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec, cfg.chlorinePump.maxDailyRuntimeMin);
-    html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec, cfg.filterPump.maxDailyRuntimeMin);
-    // ── Filter pre-run delay ──
-    html += "<div class='pt-row'><span class='pt-label'>🔒 Pre-Run:</span>";
-    html += " Filter must run <input type='number' class='pt-input' style='width:55px' id='ptd-prerun' value='" + String(cfg.filterPump.filterPreRunDelayMin) + "' min='1' max='60' step='1'> min before pH/Cl pumps start";
-    html += "</div>";
-    html += "<p class='pt-note'>⚠️ Chemistry pumps wait for filter pre-run delay after each filter restart.</p>";
-    html += "<button class='sp-apply' onclick=\"applyPumpTiming(event)\">Apply Timing</button><span class='sp-saved' id='pt-saved'>✅ Saved!</span>";
-    html += "</div>";
-    html += "<div class='card'><h2>Control Mode</h2><p>";
-    if (manualMode) html += "<button class='mode-btn auto' onclick=\"fetch('/api/manual?mode=0').then(r=>r.json()).then(d=>location.reload())\">Return to AUTO Mode</button>";
-    else html += "<button class='mode-btn' onclick=\"fetch('/api/manual?mode=1').then(r=>r.json()).then(d=>location.reload())\">Switch to MANUAL Mode</button>";
-    html += "</p></div>";
-    html += "<div class='card'><h2>Pump Control</h2><p>";
-    if (filterPumpCtrl) html += pumpButton("filter", "Filter", filterPumpCtrl->isOn(), filterPumpCtrl->getLastOnDuration() / 60000, filterPumpCtrl->getRuntimeMinutes()) + "<br>";
-    if (phPumpCtrl) html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(), phPumpCtrl->getLastOnDuration() / 60000, phPumpCtrl->getRuntimeMinutes()) + "<br>";
-    if (chlorinePumpCtrl) html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(), chlorinePumpCtrl->getLastOnDuration() / 60000, chlorinePumpCtrl->getRuntimeMinutes()) + "<br>";
-    html += "</p></div>";
-    html += "<div class='card'><h2>Relay Test</h2><p>";
-    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) html += relayButton(i, relayManager.getRelayState(i));
-    html += "</p></div>";
-    html += "<div class='card'><h2>Chemistry Status</h2><p>";
-    if (chemistryController) { html += "pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF"); html += " | Chlorine Control: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF"); }
-    html += "</p></div>";
-    html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
-    html += "<script>";
-    html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff+'&ph_day='+document.getElementById('ptd-ph').value+'&cl_day='+document.getElementById('ptd-cl').value+'&filter_day='+document.getElementById('ptd-filter').value+'&filter_prerun='+document.getElementById('ptd-prerun').value).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
-    html += "</script>";
-    html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
-    webServer.send(200, "text/html", html);
+    h += "</p></div>";
+    // Setpoints
+    float psp = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
+    float osp = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
+    h += "<div class='cd'><h2>Setpoints</h2>";
+    h += "<div class='sr2'><span class='sl'>pH:</span><input class='sr' id='sph' min='6' max='8' step='0.1' value='"+String(psp,1)+"' oninput=\"ge('sphv').textContent=value\"><span class='sv' id='sphv'>"+String(psp,1)+"</span></div>";
+    h += "<div class='sr2'><span class='sl'>ORP:</span><input class='sr' id='sop' min='200' max='900' step='10' value='"+String((int)osp)+"' oninput=\"ge('sopv').textContent=value\"><span class='sv' id='sopv'>"+String((int)osp)+"</span>mV</div>";
+    h += "<button class='ap' onclick=\"var b=event.target;b.disabled=true;fetch('/api/setpoint?ph='+ge('sph').value+'&orp='+ge('sop').value).then(r=>r.json()).then(d=>{b.disabled=false;var s=ge('sps');s.style.display='inline';setTimeout(function(){s.style.display='none'},2000)})\">Apply</button><span class='ok' id='sps'>OK</span></div>";
+    // Pump Timing
+    h += "<div class='cd'><h2>Pump Timing</h2>";
+    h += ptRow("ph","pH",cfg.phPump.minOnTimeSec,cfg.phPump.minOffTimeSec,cfg.phPump.maxDailyRuntimeMin);
+    h += ptRow("cl","Cl",cfg.chlorinePump.minOnTimeSec,cfg.chlorinePump.minOffTimeSec,cfg.chlorinePump.maxDailyRuntimeMin);
+    h += ptRow("f","Filter",cfg.filterPump.minOnTimeSec,cfg.filterPump.minOffTimeSec,cfg.filterPump.maxDailyRuntimeMin);
+    h += "<div class='pr'><span class='pl2'>PreRun:</span>Filter <input class='pi' style='width:50px' id='ppr' value='"+String(cfg.filterPump.filterPreRunDelayMin)+"' min='1' max='60'>min before pH/Cl</div>";
+    h += "<button class='ap' onclick=\"var b=event.target;b.disabled=true;fetch('/api/pump/timing?ph_on='+ge('pon-ph').value+'&ph_off='+ge('pof-ph').value+'&cl_on='+ge('pon-cl').value+'&cl_off='+ge('pof-cl').value+'&filter_on='+ge('pon-f').value+'&filter_off='+ge('pof-f').value+'&ph_day='+ge('pday-ph').value+'&cl_day='+ge('pday-cl').value+'&filter_day='+ge('pday-f').value+'&filter_prerun='+ge('ppr').value).then(r=>r.json()).then(d=>{b.disabled=false;var s=ge('pts');s.style.display='inline';setTimeout(function(){s.style.display='none'},2000)})\">Apply</button><span class='ok' id='pts'>OK</span></div>";
+    // Calibration Card
+    h += "<div class='cd'><h2>Calibration</h2>";
+    h += "<div class='cs'>pH: slope=" + String(calibrationData.phSlope,3) + " pH/V | " + calDaysAgo(calibrationData.phCalibratedAt) + "</div>";
+    h += "<div class='cs'>ORP: offset=" + String(calibrationData.orpOffset,1) + " mV | " + calDaysAgo(calibrationData.orpCalibratedAt) + "</div>";
+    if (calState == CAL_IDLE) {
+        h += "<p><button class='bc' onclick='cs()'>Calibrate pH</button> <button class='bc' onclick='co()'>Calibrate ORP</button> <button class='bc dg' onclick=\"if(confirm('Reset?'))fetch('/api/cal/reset').then(r=>r.json()).then(d=>location.reload())\">Reset</button></p>";
+    }
+    h += "<div id='cw'></div></div>";
+    // Calibration JS
+    h += "<script>function ge(id){return document.getElementById(id)}function f(u){fetch(u).then(r=>r.json()).then(d=>location.reload())}var cp=null;";
+    h += "function cpoll(){fetch('/api/cal/status').then(r=>r.json()).then(d=>{var e=ge('cw');if(!e)return;";
+    h += "if(d.state===0){e.innerHTML='';if(cp){clearInterval(cp);cp=null;}location.reload();}";
+    h += "else if(d.state==1)e.innerHTML='<p><b>pH 7.00:</b> Place probe in pH 7.00 buffer...</p><p class=cl>'+d.voltageV.toFixed(4)+' V ('+d.voltageMV.toFixed(1)+' mV) | '+d.driftMV.toFixed(2)+' mV '+(d.stable?'<span class=cg>STABLE</span>':'<span class=wn>wait...</span>')+'</p><p><button class=bc '+(!d.stable?'disabled':'')+' onclick=cl7()>Lock pH 7.00</button> <button class=\"bc dg\" onclick=cc()>Cancel</button></p>';";
+    h += "else if(d.state==2)e.innerHTML='<p><span class=cg>pH 7.00 locked:</span> '+d.lockedV.toFixed(4)+' V</p><p><button class=bc onclick=cn4()>Next: pH 4.01</button> <button class=\"bc dg\" onclick=cc()>Cancel</button></p>';";
+    h += "else if(d.state==3)e.innerHTML='<p><b>pH 4.01:</b> Rinse probe, place in pH 4.01 buffer...</p><p class=cl>'+d.voltageV.toFixed(4)+' V ('+d.voltageMV.toFixed(1)+' mV) | '+d.driftMV.toFixed(2)+' mV '+(d.stable?'<span class=cg>STABLE</span>':'<span class=wn>wait...</span>')+'</p><p><button class=bc '+(!d.stable?'disabled':'')+' onclick=cl4()>Lock & Save</button> <button class=\"bc dg\" onclick=cc()>Cancel</button></p>';";
+    h += "else if(d.state==4)e.innerHTML='<p class=cg>pH Done!</p><p>Slope: '+d.slope.toFixed(3)+' pH/V | Int: '+d.intercept.toFixed(3)+'</p><p><button class=bc onclick=location.reload()>Done</button></p>'; if(cp){clearInterval(cp);cp=null;}";
+    h += "else if(d.state==5)e.innerHTML='<p><b>ORP:</b> Place probe in ORP cal solution ('+d.orpRefMV.toFixed(0)+' mV)</p><p class=cl>'+d.voltageMV.toFixed(1)+' mV | '+d.driftMV.toFixed(2)+' mV '+(d.stable?'<span class=cg>STABLE</span>':'<span class=wn>wait...</span>')+'</p><p><button class=bc '+(!d.stable?'disabled':'')+' onclick=clo()>Lock & Save</button> <button class=\"bc dg\" onclick=cc()>Cancel</button></p>';";
+    h += "else if(d.state==6)e.innerHTML='<p class=cg>ORP Done!</p><p>Offset: '+d.offset.toFixed(1)+' mV</p><p><button class=bc onclick=location.reload()>Done</button></p>'; if(cp){clearInterval(cp);cp=null;}";
+    h += "});}";
+    h += "function cs(){fetch('/api/cal/start_ph').then(r=>r.json()).then(d=>{if(d.ok){cp=setInterval(cpoll,1000);cpoll();}})}";
+    h += "function cl7(){fetch('/api/cal/lock_ph7').then(r=>r.json()).then(d=>cpoll())}";
+    h += "function cn4(){fetch('/api/cal/lock_ph7').then(r=>r.json()).then(d=>cpoll())}";
+    h += "function cl4(){fetch('/api/cal/lock_ph4').then(r=>r.json()).then(d=>cpoll())}";
+    h += "function co(){fetch('/api/cal/start_orp').then(r=>r.json()).then(d=>{if(d.ok){cp=setInterval(cpoll,1000);cpoll();}})}";
+    h += "function clo(){var r=prompt('ORP cal solution value (mV):','220');if(r){fetch('/api/cal/lock_orp?ref='+encodeURIComponent(r)).then(r=>r.json()).then(d=>cpoll())}}";
+    h += "function cc(){fetch('/api/cal/reset?cancel=1').then(r=>r.json()).then(d=>{if(cp)clearInterval(cp);cp=null;location.reload()})}</script>";
+    // Control, Pumps, Relays
+    h += "<div class='cd'><h2>Control</h2><p>";
+    if (manualMode) h += "<button class='mode-btn auto' onclick=\"f('/api/manual?mode=0')\">AUTO</button>";
+    else h += "<button class='mode-btn' onclick=\"f('/api/manual?mode=1')\">MANUAL</button>";
+    h += "</p></div><div class='cd'><h2>Pumps</h2><p>";
+    if (filterPumpCtrl) h += pumpBtn("filter","Filter",filterPumpCtrl->isOn(),filterPumpCtrl->getLastOnDuration()/60000,filterPumpCtrl->getRuntimeMinutes())+"<br>";
+    if (phPumpCtrl) h += pumpBtn("ph","pH",phPumpCtrl->isOn(),phPumpCtrl->getLastOnDuration()/60000,phPumpCtrl->getRuntimeMinutes())+"<br>";
+    if (chlorinePumpCtrl) h += pumpBtn("chlorine","Cl",chlorinePumpCtrl->isOn(),chlorinePumpCtrl->getLastOnDuration()/60000,chlorinePumpCtrl->getRuntimeMinutes())+"<br>";
+    h += "</p></div><div class='cd'><h2>Relays</h2><p>";
+    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) h += rBtn(i, relayManager.getRelayState(i));
+    h += "</p></div><div class='cd'><h2>Chem</h2><p>";
+    if (chemistryController) { h += "pH:"+String(chemistryController->isPHEnabled()?"ON":"OFF")+" Cl:"+String(chemistryController->isChlorineEnabled()?"ON":"OFF"); }
+    h += "</p></div><div class='cd'><h2>Quick</h2><p><a href='/api/alloff' style='color:#f44'>Emergency All Off</a></p></div>";
+    h += "<p style='color:#555;font-size:0.7em'>Pool Controller v1.1.0</p></body></html>";
+    webServer.send(200, "text/html", h);
 }
 
+// ── Standard API ──
 void handleAPI() {
     AppConfig& cfg = configManager.get();
     StaticJsonDocument<1024> doc;
@@ -165,45 +168,42 @@ void handleAPI() {
     doc["ph_setpoint"] = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
     doc["orp_setpoint"] = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
     JsonObject pumps = doc.createNestedObject("pumps");
-    if (filterPumpCtrl) { JsonObject f = pumps.createNestedObject("filter"); f["on"] = filterPumpCtrl->isOn(); f["current_min"] = filterPumpCtrl->getLastOnDuration() / 60000; f["today_min"] = filterPumpCtrl->getRuntimeMinutes(); }
-    if (phPumpCtrl) { JsonObject p = pumps.createNestedObject("ph"); p["on"] = phPumpCtrl->isOn(); p["current_min"] = phPumpCtrl->getLastOnDuration() / 60000; p["today_min"] = phPumpCtrl->getRuntimeMinutes(); }
-    if (chlorinePumpCtrl) { JsonObject c = pumps.createNestedObject("chlorine"); c["on"] = chlorinePumpCtrl->isOn(); c["current_min"] = chlorinePumpCtrl->getLastOnDuration() / 60000; c["today_min"] = chlorinePumpCtrl->getRuntimeMinutes(); }
+    if (filterPumpCtrl) { JsonObject f = pumps.createNestedObject("filter"); f["on"] = filterPumpCtrl->isOn(); f["today_min"] = filterPumpCtrl->getRuntimeMinutes(); }
+    if (phPumpCtrl) { JsonObject p = pumps.createNestedObject("ph"); p["on"] = phPumpCtrl->isOn(); p["today_min"] = phPumpCtrl->getRuntimeMinutes(); }
+    if (chlorinePumpCtrl) { JsonObject c = pumps.createNestedObject("chlorine"); c["on"] = chlorinePumpCtrl->isOn(); c["today_min"] = chlorinePumpCtrl->getRuntimeMinutes(); }
     JsonArray relays = doc.createNestedArray("relays");
     for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) relays.add(relayManager.getRelayState(i));
     String json; serializeJson(doc, json); webServer.send(200, "application/json", json);
 }
 
 void handleAPIRelaySet() {
-    if (!webServer.hasArg("channel") || !webServer.hasArg("state")) { webServer.send(400, "application/json", "{\"error\":\"missing args\"}"); return; }
-    int channel = webServer.arg("channel").toInt(); bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
-    if (channel < 0 || channel >= KC868_A8_RELAY_COUNT) { webServer.send(400, "application/json", "{\"error\":\"bad channel\"}"); return; }
-    relayManager.setRelay((uint8_t)channel, state);
-    webServer.send(200, "application/json", "{\"ok\":true}");
+    if (!webServer.hasArg("channel") || !webServer.hasArg("state")) { webServer.send(400,"application/json","{\"error\":\"missing args\"}"); return; }
+    int ch = webServer.arg("channel").toInt(); bool st = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
+    if (ch < 0 || ch >= KC868_A8_RELAY_COUNT) { webServer.send(400,"application/json","{\"error\":\"bad channel\"}"); return; }
+    relayManager.setRelay((uint8_t)ch, st); webServer.send(200,"application/json","{\"ok\":true}");
 }
 
 void handleAPIPumpSet() {
-    if (!webServer.hasArg("id") || !webServer.hasArg("state")) { webServer.send(400, "application/json", "{\"error\":\"missing args\"}"); return; }
-    String id = webServer.arg("id"); bool state = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
-    PumpController* pump = nullptr;
-    if (id == "filter") pump = filterPumpCtrl; else if (id == "ph") pump = phPumpCtrl; else if (id == "chlorine") pump = chlorinePumpCtrl;
-    if (!pump) { webServer.send(400, "application/json", "{\"error\":\"bad id\"}"); return; }
-    bool ok = state ? pump->turnOn() : pump->turnOff();
-    String json = "{\"ok\":" + String(ok) + ",\"pump\":\"" + id + "\"}";
-    webServer.send(200, "application/json", json);
+    if (!webServer.hasArg("id") || !webServer.hasArg("state")) { webServer.send(400,"application/json","{\"error\":\"missing args\"}"); return; }
+    String id = webServer.arg("id"); bool st = (webServer.arg("state") == "1" || webServer.arg("state") == "true");
+    PumpController* p = nullptr;
+    if (id == "filter") p = filterPumpCtrl; else if (id == "ph") p = phPumpCtrl; else if (id == "chlorine") p = chlorinePumpCtrl;
+    if (!p) { webServer.send(400,"application/json","{\"error\":\"bad id\"}"); return; }
+    bool ok = st ? p->turnOn() : p->turnOff();
+    webServer.send(200,"application/json","{\"ok\":" + String(ok) + ",\"pump\":\"" + id + "\"}");
 }
 
 void handleAPIManualMode() {
-    if (!webServer.hasArg("mode")) { webServer.send(400, "application/json", "{\"error\":\"missing mode\"}"); return; }
+    if (!webServer.hasArg("mode")) { webServer.send(400,"application/json","{\"error\":\"missing mode\"}"); return; }
     manualMode = (webServer.arg("mode") == "1" || webServer.arg("mode") == "true");
     if (!manualMode && chemistryController) chemistryController->begin();
-    webServer.send(200, "application/json", "{\"ok\":true}");
+    webServer.send(200,"application/json","{\"ok\":true}");
 }
 
-void handleAPIAllOff() { relayManager.allOff(); webServer.send(200, "application/json", "{\"ok\":true}"); }
+void handleAPIAllOff() { relayManager.allOff(); webServer.send(200,"application/json","{\"ok\":true}"); }
 
 void handleAPISetpoint() {
-    AppConfig& cfg = configManager.get();
-    bool changed = false;
+    AppConfig& cfg = configManager.get(); bool changed = false;
     if (webServer.hasArg("ph")) { float ph = webServer.arg("ph").toFloat(); if (ph >= 6.0f && ph <= 8.0f) { if (chemistryController) chemistryController->setPHSetpoint(ph); else cfg.phPID.setpoint = ph; changed = true; } }
     if (webServer.hasArg("orp")) { float orp = webServer.arg("orp").toFloat(); if (orp >= 200.0f && orp <= 900.0f) { if (chemistryController) chemistryController->setORPSetpoint(orp); else cfg.chlorinePID.setpoint = orp; changed = true; } }
     if (changed && chemistryController) configManager.save();
@@ -211,250 +211,161 @@ void handleAPISetpoint() {
 }
 
 void handleAPIPumpTiming() {
-    AppConfig& cfg = configManager.get();
-    bool changed = false;
-
-    auto applyTiming = [](int val, int& target, int minVal, int maxVal) -> bool {
-        if (val >= minVal && val <= maxVal) { target = val; return true; }
-        return false;
-    };
-
-    if (webServer.hasArg("ph_on")) { int v = webServer.arg("ph_on").toInt(); if (applyTiming(v, cfg.phPump.minOnTimeSec, 1, 3600)) changed = true; }
-    if (webServer.hasArg("ph_off")) { int v = webServer.arg("ph_off").toInt(); if (applyTiming(v, cfg.phPump.minOffTimeSec, 1, 7200)) changed = true; }
-    if (webServer.hasArg("cl_on")) { int v = webServer.arg("cl_on").toInt(); if (applyTiming(v, cfg.chlorinePump.minOnTimeSec, 1, 3600)) changed = true; }
-    if (webServer.hasArg("cl_off")) { int v = webServer.arg("cl_off").toInt(); if (applyTiming(v, cfg.chlorinePump.minOffTimeSec, 1, 7200)) changed = true; }
-    if (webServer.hasArg("filter_on")) { int v = webServer.arg("filter_on").toInt(); if (applyTiming(v, cfg.filterPump.minOnTimeSec, 1, 3600)) changed = true; }
-    if (webServer.hasArg("filter_off")) { int v = webServer.arg("filter_off").toInt(); if (applyTiming(v, cfg.filterPump.minOffTimeSec, 1, 7200)) changed = true; }
-    auto applyDaily = [](float val, float& target, float minVal, float maxVal) -> bool {
-        if (val >= minVal && val <= maxVal) { target = val; return true; }
-        return false;
-    };
-    if (webServer.hasArg("ph_day")) { float v = webServer.arg("ph_day").toFloat(); if (applyDaily(v, cfg.phPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
-    if (webServer.hasArg("cl_day")) { float v = webServer.arg("cl_day").toFloat(); if (applyDaily(v, cfg.chlorinePump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
-    if (webServer.hasArg("filter_day")) { float v = webServer.arg("filter_day").toFloat(); if (applyDaily(v, cfg.filterPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
-    // ── Filter pre-run delay ──
-    if (webServer.hasArg("filter_prerun")) { int v = webServer.arg("filter_prerun").toInt(); if (applyTiming(v, cfg.filterPump.filterPreRunDelayMin, 1, 60)) changed = true; }
-
-    if (changed) {
-        configManager.save();
-        applyPumpConfig();
-    }
+    AppConfig& cfg = configManager.get(); bool changed = false;
+    auto at = [](int v, int& t, int mn, int mx)->bool { if (v>=mn&&v<=mx) { t=v; return true; } return false; };
+    if (webServer.hasArg("ph_on")) { if(at(webServer.arg("ph_on").toInt(),cfg.phPump.minOnTimeSec,1,3600))changed=true; }
+    if (webServer.hasArg("ph_off")) { if(at(webServer.arg("ph_off").toInt(),cfg.phPump.minOffTimeSec,1,7200))changed=true; }
+    if (webServer.hasArg("cl_on")) { if(at(webServer.arg("cl_on").toInt(),cfg.chlorinePump.minOnTimeSec,1,3600))changed=true; }
+    if (webServer.hasArg("cl_off")) { if(at(webServer.arg("cl_off").toInt(),cfg.chlorinePump.minOffTimeSec,1,7200))changed=true; }
+    if (webServer.hasArg("filter_on")) { if(at(webServer.arg("filter_on").toInt(),cfg.filterPump.minOnTimeSec,1,3600))changed=true; }
+    if (webServer.hasArg("filter_off")) { if(at(webServer.arg("filter_off").toInt(),cfg.filterPump.minOffTimeSec,1,7200))changed=true; }
+    auto ad = [](float v, float& t, float mn, float mx)->bool { if (v>=mn&&v<=mx) { t=v; return true; } return false; };
+    if (webServer.hasArg("ph_day")) { if(ad(webServer.arg("ph_day").toFloat(),cfg.phPump.maxDailyRuntimeMin,1,1440))changed=true; }
+    if (webServer.hasArg("cl_day")) { if(ad(webServer.arg("cl_day").toFloat(),cfg.chlorinePump.maxDailyRuntimeMin,1,1440))changed=true; }
+    if (webServer.hasArg("filter_day")) { if(ad(webServer.arg("filter_day").toFloat(),cfg.filterPump.maxDailyRuntimeMin,1,1440))changed=true; }
+    if (webServer.hasArg("filter_prerun")) { if(at(webServer.arg("filter_prerun").toInt(),cfg.filterPump.filterPreRunDelayMin,1,60))changed=true; }
+    if (changed) { configManager.save(); applyPumpConfig(); }
     webServer.send(changed ? 200 : 400, "application/json", "{\"ok\":" + String(changed) + "}");
 }
 
 void setupWebServer() {
-    webServer.on("/", handleRoot); webServer.on("/api", handleAPI); webServer.on("/api/relay/set", handleAPIRelaySet);
-    webServer.on("/api/pump/set", handleAPIPumpSet); webServer.on("/api/manual", handleAPIManualMode);
-    webServer.on("/api/alloff", handleAPIAllOff); webServer.on("/api/setpoint", handleAPISetpoint);
-    webServer.on("/api/pump/timing", handleAPIPumpTiming);
+    webServer.on("/", handleRoot); webServer.on("/api", handleAPI);
+    webServer.on("/api/relay/set", handleAPIRelaySet); webServer.on("/api/pump/set", handleAPIPumpSet);
+    webServer.on("/api/manual", handleAPIManualMode); webServer.on("/api/alloff", handleAPIAllOff);
+    webServer.on("/api/setpoint", handleAPISetpoint); webServer.on("/api/pump/timing", handleAPIPumpTiming);
+    webServer.on("/api/cal/status", handleCalStatus); webServer.on("/api/cal/start_ph", handleCalStartPH);
+    webServer.on("/api/cal/lock_ph7", handleCalLockPH7); webServer.on("/api/cal/start_ph4", handleCalStartPH4);
+    webServer.on("/api/cal/lock_ph4", handleCalLockPH4); webServer.on("/api/cal/start_orp", handleCalStartORP);
+    webServer.on("/api/cal/lock_orp", handleCalLockORP); webServer.on("/api/cal/reset", handleCalReset);
     webServer.begin();
 }
 
 void setupWiFi() {
     AppConfig& cfg = configManager.get();
-    String hostname = cfg.wifi.hostname; if (hostname.length() == 0) hostname = WIFI_HOSTNAME;
-    WiFi.setHostname(hostname.c_str()); WiFi.mode(WIFI_MODE_STA);
-    if (cfg.wifi.ssid.length() > 0) { WiFi.begin(cfg.wifi.ssid.c_str(), cfg.wifi.password.c_str()); for (int a = 0; WiFi.status() != WL_CONNECTED && a < 40; a++) delay(500); if (WiFi.status() == WL_CONNECTED) { wifiConnected = true; return; } }
-    if (cfg.wifi.fallbackAP) { String s = cfg.wifi.apSSID, p = cfg.wifi.apPassword; if (s.length() == 0) s = AP_SSID; if (p.length() == 0) p = AP_PASSWORD; WiFi.mode(WIFI_MODE_AP); WiFi.softAPConfig(AP_IP, AP_GATEWAY, AP_SUBNET); WiFi.softAP(s.c_str(), p.c_str()); }
+    String h = cfg.wifi.hostname; if (h.length() == 0) h = WIFI_HOSTNAME;
+    WiFi.setHostname(h.c_str()); WiFi.mode(WIFI_MODE_STA);
+    if (cfg.wifi.ssid.length() > 0) {
+        WiFi.begin(cfg.wifi.ssid.c_str(), cfg.wifi.password.c_str());
+        for (int a = 0; WiFi.status() != WL_CONNECTED && a < 40; a++) delay(500);
+        if (WiFi.status() == WL_CONNECTED) { wifiConnected = true; return; }
+    }
+    if (cfg.wifi.fallbackAP) {
+        String s = cfg.wifi.apSSID; if (s.length() == 0) s = AP_SSID;
+        WiFi.mode(WIFI_MODE_AP); WiFi.softAPConfig(AP_IP, AP_GW, AP_SN);
+        WiFi.softAP(s.c_str(), "12345678");
+    }
 }
 
 void maintainWiFi() {
-    if (WiFi.status() != WL_CONNECTED && !wifiConnected) { if (millis() - wifiReconnectTime > 60000) { wifiReconnectTime = millis(); AppConfig& cfg = configManager.get(); if (cfg.wifi.ssid.length() > 0) WiFi.reconnect(); else setupWiFi(); } }
-    else if (WiFi.status() == WL_CONNECTED) wifiConnected = true;
+    if (WiFi.status() != WL_CONNECTED && !wifiConnected) {
+        if (millis() - wifiReconnectTime > 60000) {
+            wifiReconnectTime = millis(); AppConfig& cfg = configManager.get();
+            if (cfg.wifi.ssid.length() > 0) WiFi.reconnect(); else setupWiFi();
+        }
+    } else if (WiFi.status() == WL_CONNECTED) wifiConnected = true;
 }
 
 void applyPumpConfig() {
     AppConfig& cfg = configManager.get();
-    if (phPumpCtrl) {
-        phPumpCtrl->setMinOnTime((unsigned long)(cfg.phPump.minOnTimeSec * 1000));
-        phPumpCtrl->setMinOffTime((unsigned long)(cfg.phPump.minOffTimeSec * 1000));
-        phPumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin * 60000));
-    }
-    if (chlorinePumpCtrl) {
-        chlorinePumpCtrl->setMinOnTime((unsigned long)(cfg.chlorinePump.minOnTimeSec * 1000));
-        chlorinePumpCtrl->setMinOffTime((unsigned long)(cfg.chlorinePump.minOffTimeSec * 1000));
-        chlorinePumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin * 60000));
-    }
-    if (filterPumpCtrl) {
-        filterPumpCtrl->setMinOnTime((unsigned long)(cfg.filterPump.minOnTimeSec * 1000));
-        filterPumpCtrl->setMinOffTime((unsigned long)(cfg.filterPump.minOffTimeSec * 1000));
-    }
-    log_i("Pump timing applied: pH=%d/%ds Cl=%d/%ds Filter=%d/%ds PreRunDelay=%dmin",
-          cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec,
-          cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec,
-          cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec,
-          cfg.filterPump.filterPreRunDelayMin);
+    if (phPumpCtrl) { phPumpCtrl->setMinOnTime((unsigned long)(cfg.phPump.minOnTimeSec*1000)); phPumpCtrl->setMinOffTime((unsigned long)(cfg.phPump.minOffTimeSec*1000)); phPumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin*60000)); }
+    if (chlorinePumpCtrl) { chlorinePumpCtrl->setMinOnTime((unsigned long)(cfg.chlorinePump.minOnTimeSec*1000)); chlorinePumpCtrl->setMinOffTime((unsigned long)(cfg.chlorinePump.minOffTimeSec*1000)); chlorinePumpCtrl->setFilterPreRunDelay((unsigned long)(cfg.filterPump.filterPreRunDelayMin*60000)); }
+    if (filterPumpCtrl) { filterPumpCtrl->setMinOnTime((unsigned long)(cfg.filterPump.minOnTimeSec*1000)); filterPumpCtrl->setMinOffTime((unsigned long)(cfg.filterPump.minOffTimeSec*1000)); }
 }
 
 void handleMQTTCommand(const char* topic, const String& payload) {
-    String t = String(topic); AppConfig& cfg = configManager.get(); String base = cfg.mqtt.baseTopic + "/command/";
-    if (t == base + "ph_setpoint") { float v = payload.toFloat(); if (v >= 6.0 && v <= 8.0 && chemistryController) chemistryController->setPHSetpoint(v); }
-    else if (t == base + "orp_setpoint") { float v = payload.toFloat(); if (v >= 200 && v <= 900 && chemistryController) chemistryController->setORPSetpoint(v); }
-    else if (t == base + "ph_set_enabled") { if (chemistryController) chemistryController->setPHEnabled(payload == "true" || payload == "1" || payload == "ON"); }
-    else if (t == base + "cl_set_enabled") { if (chemistryController) chemistryController->setChlorineEnabled(payload == "true" || payload == "1" || payload == "ON"); }
-    else if (t == base + "all_off") relayManager.allOff();
-    else if (t == base + "reset_config") { if (payload == "confirm") { configManager.get() = AppConfig(); configManager.save(); delay(1000); ESP.restart(); } }
-    else if (t == base + "restart") { if (payload == "confirm") { delay(500); ESP.restart(); } }
-    // ── Individual pump timing commands (used by HA autodiscovery number entities) ──
-    else if (t == base + "ph_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.phPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    else if (t == base + "ph_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.phPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    else if (t == base + "cl_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.chlorinePump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    else if (t == base + "cl_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.chlorinePump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    else if (t == base + "filter_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.filterPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    else if (t == base + "filter_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.filterPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    // ── Individual daily limit commands ──
-    else if (t == base + "ph_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.phPump.maxDailyRuntimeMin = v; configManager.save(); } }
-    else if (t == base + "cl_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.chlorinePump.maxDailyRuntimeMin = v; configManager.save(); } }
-    else if (t == base + "filter_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.filterPump.maxDailyRuntimeMin = v; configManager.save(); } }
-    // ── Filter pre-run delay ──
-    else if (t == base + "filter_prerun_delay") { int v = payload.toInt(); if (v >= 1 && v <= 60) { cfg.filterPump.filterPreRunDelayMin = v; configManager.save(); applyPumpConfig(); log_i("MQTT: filter pre-run delay set to %d min", v); } }
-    // ── Bulk pump timing (JSON) ──
-    else if (t == base + "pump_timing") {
-        StaticJsonDocument<256> doc;
-        if (deserializeJson(doc, payload) == DeserializationError::Ok) {
-            if (doc["ph"]["minOn"].is<int>()) cfg.phPump.minOnTimeSec = doc["ph"]["minOn"];
-            if (doc["ph"]["minOff"].is<int>()) cfg.phPump.minOffTimeSec = doc["ph"]["minOff"];
-            if (doc["chlorine"]["minOn"].is<int>()) cfg.chlorinePump.minOnTimeSec = doc["chlorine"]["minOn"];
-            if (doc["chlorine"]["minOff"].is<int>()) cfg.chlorinePump.minOffTimeSec = doc["chlorine"]["minOff"];
-            if (doc["filter"]["minOn"].is<int>()) cfg.filterPump.minOnTimeSec = doc["filter"]["minOn"];
-            if (doc["filter"]["minOff"].is<int>()) cfg.filterPump.minOffTimeSec = doc["filter"]["minOff"];
-            if (doc["filter"]["preRunDelay"].is<int>()) cfg.filterPump.filterPreRunDelayMin = doc["filter"]["preRunDelay"];
-            configManager.save();
-            applyPumpConfig();
-            log_i("MQTT: pump timing updated");
-        }
-    }
+    String t = String(topic); AppConfig& cfg = configManager.get(); String b = cfg.mqtt.baseTopic + "/command/";
+    if (t == b+"ph_setpoint") { float v = payload.toFloat(); if (v>=6.0&&v<=8.0&&chemistryController) chemistryController->setPHSetpoint(v); }
+    else if (t == b+"orp_setpoint") { float v = payload.toFloat(); if (v>=200&&v<=900&&chemistryController) chemistryController->setORPSetpoint(v); }
+    else if (t == b+"ph_set_enabled") { if (chemistryController) chemistryController->setPHEnabled(payload=="true"||payload=="1"||payload=="ON"); }
+    else if (t == b+"cl_set_enabled") { if (chemistryController) chemistryController->setChlorineEnabled(payload=="true"||payload=="1"||payload=="ON"); }
+    else if (t == b+"all_off") relayManager.allOff();
+    else if (t == b+"reset_config") { if (payload=="confirm") { configManager.get() = AppConfig(); configManager.save(); delay(1000); ESP.restart(); } }
+    else if (t == b+"restart") { if (payload=="confirm") { delay(500); ESP.restart(); } }
+    else if (t == b+"ph_pump_min_on")  { int v = payload.toInt(); if(v>=1&&v<=3600){cfg.phPump.minOnTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"ph_pump_min_off") { int v = payload.toInt(); if(v>=1&&v<=7200){cfg.phPump.minOffTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"cl_pump_min_on")  { int v = payload.toInt(); if(v>=1&&v<=3600){cfg.chlorinePump.minOnTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"cl_pump_min_off") { int v = payload.toInt(); if(v>=1&&v<=7200){cfg.chlorinePump.minOffTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"filter_pump_min_on")  { int v = payload.toInt(); if(v>=1&&v<=3600){cfg.filterPump.minOnTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"filter_pump_min_off") { int v = payload.toInt(); if(v>=1&&v<=7200){cfg.filterPump.minOffTimeSec=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"ph_pump_max_day")  { float v = payload.toFloat(); if(v>=1&&v<=1440){cfg.phPump.maxDailyRuntimeMin=v;configManager.save();} }
+    else if (t == b+"cl_pump_max_day")  { float v = payload.toFloat(); if(v>=1&&v<=1440){cfg.chlorinePump.maxDailyRuntimeMin=v;configManager.save();} }
+    else if (t == b+"filter_pump_max_day")  { float v = payload.toFloat(); if(v>=1&&v<=1440){cfg.filterPump.maxDailyRuntimeMin=v;configManager.save();} }
+    else if (t == b+"filter_prerun_delay") { int v = payload.toInt(); if(v>=1&&v<=60){cfg.filterPump.filterPreRunDelayMin=v;configManager.save();applyPumpConfig();} }
+    else if (t == b+"cal_ph_start") { PHSensor* ph = sensorManager?sensorManager->getPHSensor():nullptr; if(ph&&ph->isConnected()){calState=CAL_PH_WAIT_7;calResetWindow();} }
+    else if (t == b+"cal_ph_lock7") { PHSensor* ph = sensorManager?sensorManager->getPHSensor():nullptr; if(ph&&calState==CAL_PH_WAIT_7){calPH7Voltage=ph->readRawVoltage();calState=CAL_PH_LOCKED_7;} }
+    else if (t == b+"cal_ph_lock4") { PHSensor* ph = sensorManager?sensorManager->getPHSensor():nullptr; if(ph){if(calState==CAL_PH_LOCKED_7){calState=CAL_PH_WAIT_4;calResetWindow();}else if(calState==CAL_PH_WAIT_4){calPH4Voltage=ph->readRawVoltage();ph->setCalibration(calPH7Voltage,calPH4Voltage);ph->saveCalibration(calibrationData);calibrationData.save();calState=CAL_IDLE;}} }
+    else if (t == b+"cal_orp_start") { ORPSensor* orp = sensorManager?sensorManager->getORPSensor():nullptr; if(orp&&orp->isConnected()){calState=CAL_ORP_WAIT;calResetWindow();} }
+    else if (t == b+"cal_orp_lock") { ORPSensor* orp = sensorManager?sensorManager->getORPSensor():nullptr; if(orp&&calState==CAL_ORP_WAIT){float r=payload.toFloat();if(r>=100&&r<=900)calORPRequiredMV=r;orp->setCalibration(calORPRequiredMV);orp->saveCalibration(calibrationData);calibrationData.save();calState=CAL_IDLE;} }
+    else if (t == b+"cal_reset") { calibrationData=CalibrationData();calibrationData.save();PHSensor*ph=sensorManager?sensorManager->getPHSensor():nullptr;ORPSensor*or=sensorManager?sensorManager->getORPSensor():nullptr;if(ph)ph->loadCalibration(calibrationData);if(or)or->loadCalibration(calibrationData); }
+    else if (t == b+"pump_timing") { StaticJsonDocument<256> doc; if(deserializeJson(doc,payload)==DeserializationError::Ok){if(doc["ph"]["minOn"].is<int>())cfg.phPump.minOnTimeSec=doc["ph"]["minOn"];if(doc["ph"]["minOff"].is<int>())cfg.phPump.minOffTimeSec=doc["ph"]["minOff"];if(doc["chlorine"]["minOn"].is<int>())cfg.chlorinePump.minOnTimeSec=doc["chlorine"]["minOn"];if(doc["chlorine"]["minOff"].is<int>())cfg.chlorinePump.minOffTimeSec=doc["chlorine"]["minOff"];if(doc["filter"]["minOn"].is<int>())cfg.filterPump.minOnTimeSec=doc["filter"]["minOn"];if(doc["filter"]["minOff"].is<int>())cfg.filterPump.minOffTimeSec=doc["filter"]["minOff"];if(doc["filter"]["preRunDelay"].is<int>())cfg.filterPump.filterPreRunDelayMin=doc["filter"]["preRunDelay"];configManager.save();applyPumpConfig();} }
 }
 
 void feedWatchdog() { esp_task_wdt_reset(); }
 
 void setup() {
     Serial.begin(115200); delay(1000);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-    esp_task_wdt_config_t twdt_config = { .timeout_ms = 30000, .trigger_panic = true }; esp_task_wdt_init(&twdt_config);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
+    esp_task_wdt_config_t t = { .timeout_ms = 30000, .trigger_panic = true }; esp_task_wdt_init(&t);
 #else
     esp_task_wdt_init(30, true);
 #endif
     esp_task_wdt_add(NULL);
     if (!configManager.begin()) log_w("Config defaults");
+    calibrationData.load();
     Wire.begin(4, 5); relayManager.begin(); relayManager.allOff();
     sensorManager = new SensorManager(configManager); sensorManager->begin();
+    PHSensor* ph = sensorManager->getPHSensor(); ORPSensor* orp = sensorManager->getORPSensor();
+    if (ph) ph->loadCalibration(calibrationData); if (orp) orp->loadCalibration(calibrationData);
     AppConfig& cfg = configManager.get();
     phPumpCtrl = new PumpController(relayManager, cfg.phPump.relayChannel, "pH Pump"); phPumpCtrl->begin();
     chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump"); chlorinePumpCtrl->begin();
     filterPumpCtrl = new PumpController(relayManager, cfg.filterPump.relayChannel, "Filter Pump"); filterPumpCtrl->begin();
-
-    // Apply anti-short-cycle timing from pump config (not PID params)
     applyPumpConfig();
-
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl); filterPumpLogic->begin();
     filterPumpCtrl->addDependent(phPumpCtrl); filterPumpCtrl->addDependent(chlorinePumpCtrl);
     chemistryController = new PoolChemistryController(configManager, *sensorManager, *phPumpCtrl, *chlorinePumpCtrl); chemistryController->begin();
     setupWiFi(); setupWebServer();
-
-    if (wifiConnected) {
-        initNTP(7200, 3600);
-        waitForNTPSync(15);
-    }
-
+    if (wifiConnected) { initNTP(7200, 3600); waitForNTPSync(15); }
     mqttManager = new MQTTManager(configManager); mqttManager->begin(); mqttManager->setCommandCallback(handleMQTTCommand);
-    systemReady = true;
-    log_i("═══ System ready (%lu ms) ═══", millis());
+    systemReady = true; log_i("System ready (%lu ms)", millis());
 }
 
 void loop() {
-    unsigned long loopStart = millis();
-    feedWatchdog();
-    maintainWiFi();
-    if (mqttManager) mqttManager->loop();
-    webServer.handleClient();
+    unsigned long ls = millis();
+    feedWatchdog(); maintainWiFi();
+    if (mqttManager) mqttManager->loop(); webServer.handleClient();
     if (sensorManager) sensorManager->update();
     if (chemistryController && systemReady && !manualMode) chemistryController->update();
     if (filterPumpLogic && sensorManager && !manualMode) filterPumpLogic->update(sensorManager->getWaterTemperature());
-
     AppConfig& cfg = configManager.get();
-
-    // MQTT State Publishing — matches HA Discovery value_template paths
     if (mqttManager && mqttManager->isConnected() && systemReady) {
         unsigned long now = millis();
         if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
             lastSensorPublish = now;
-            log_i("MQTT: publishing sensor states");
-
-            // Dedicated raw-value topics (no JSON parsing needed by HA)
-            if (sensorManager)
-                mqttManager->publish("ph", String(sensorManager->getPH(), 2), false);
-
-            // Composite JSON topics (multiple values per topic)
-            // Sensor states via SensorManager::getAllStateJSON()
-            if (sensorManager)
-                mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
-
-            // Chemistry controller state via PoolChemistryController::getStateJSON()
-            if (chemistryController)
-                mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
-
-            // Filter pump logic state via FilterPumpLogic::getStateJSON()
-            if (filterPumpLogic)
-                mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
-
-            // Pump runtime states
-            StaticJsonDocument<256> pumpDoc;
-            if (phPumpCtrl) {
-                JsonObject ph = pumpDoc.createNestedObject("ph_pump");
-                ph["name"] = phPumpCtrl->getName();
-                ph["on"] = phPumpCtrl->isOn();
-                ph["runtime_today_min"] = phPumpCtrl->getRuntimeMinutes();
-                ph["last_on_duration_ms"] = phPumpCtrl->getLastOnDuration();
-            }
-            if (chlorinePumpCtrl) {
-                JsonObject cl = pumpDoc.createNestedObject("chlorine_pump");
-                cl["name"] = chlorinePumpCtrl->getName();
-                cl["on"] = chlorinePumpCtrl->isOn();
-                cl["runtime_today_min"] = chlorinePumpCtrl->getRuntimeMinutes();
-                cl["last_on_duration_ms"] = chlorinePumpCtrl->getLastOnDuration();
-            }
-            if (filterPumpCtrl) {
-                JsonObject f = pumpDoc.createNestedObject("filter_pump");
-                f["name"] = filterPumpCtrl->getName();
-                f["on"] = filterPumpCtrl->isOn();
-                f["runtime_today_min"] = filterPumpCtrl->getRuntimeMinutes();
-                f["last_on_duration_ms"] = filterPumpCtrl->getLastOnDuration();
-            }
-            String pumpStates;
-            serializeJson(pumpDoc, pumpStates);
-            mqttManager->publish("pumps", pumpStates, false);
-
-            // Pump timing config state (for HA autodiscovery number entities)
-            StaticJsonDocument<192> timingDoc;
-            JsonObject tph = timingDoc.createNestedObject("ph");
-            tph["minOn"] = cfg.phPump.minOnTimeSec;
-            tph["minOff"] = cfg.phPump.minOffTimeSec;
-            tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
-            JsonObject tcl = timingDoc.createNestedObject("chlorine");
-            tcl["minOn"] = cfg.chlorinePump.minOnTimeSec;
-            tcl["minOff"] = cfg.chlorinePump.minOffTimeSec;
-            tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
-            JsonObject tf = timingDoc.createNestedObject("filter");
-            tf["minOn"] = cfg.filterPump.minOnTimeSec;
-            tf["minOff"] = cfg.filterPump.minOffTimeSec;
-            tf["maxDailyMin"] = cfg.filterPump.maxDailyRuntimeMin;
-            tf["preRunDelay"] = cfg.filterPump.filterPreRunDelayMin;
-            String timingJson;
-            serializeJson(timingDoc, timingJson);
-            mqttManager->publish("pump_config", timingJson, false);
+            if (sensorManager) mqttManager->publish("ph", String(sensorManager->getPH(),2), false);
+            if (sensorManager) mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
+            if (chemistryController) mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
+            if (filterPumpLogic) mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
+            StaticJsonDocument<256> pd;
+            if (phPumpCtrl) { JsonObject p=pd.createNestedObject("ph_pump");p["on"]=phPumpCtrl->isOn();p["runtime_today_min"]=phPumpCtrl->getRuntimeMinutes(); }
+            if (chlorinePumpCtrl) { JsonObject c=pd.createNestedObject("chlorine_pump");c["on"]=chlorinePumpCtrl->isOn();c["runtime_today_min"]=chlorinePumpCtrl->getRuntimeMinutes(); }
+            if (filterPumpCtrl) { JsonObject f=pd.createNestedObject("filter_pump");f["on"]=filterPumpCtrl->isOn();f["runtime_today_min"]=filterPumpCtrl->getRuntimeMinutes(); }
+            String ps; serializeJson(pd,ps); mqttManager->publish("pumps",ps,false);
+            StaticJsonDocument<192> td;
+            JsonObject tp=td.createNestedObject("ph");tp["minOn"]=cfg.phPump.minOnTimeSec;tp["minOff"]=cfg.phPump.minOffTimeSec;tp["maxDailyMin"]=cfg.phPump.maxDailyRuntimeMin;
+            JsonObject tc=td.createNestedObject("chlorine");tc["minOn"]=cfg.chlorinePump.minOnTimeSec;tc["minOff"]=cfg.chlorinePump.minOffTimeSec;tc["maxDailyMin"]=cfg.chlorinePump.maxDailyRuntimeMin;
+            JsonObject tf=td.createNestedObject("filter");tf["minOn"]=cfg.filterPump.minOnTimeSec;tf["minOff"]=cfg.filterPump.minOffTimeSec;tf["maxDailyMin"]=cfg.filterPump.maxDailyRuntimeMin;tf["preRunDelay"]=cfg.filterPump.filterPreRunDelayMin;
+            String tj; serializeJson(td,tj); mqttManager->publish("pump_config",tj,false);
+            StaticJsonDocument<256> cd;
+            JsonObject phc=cd.createNestedObject("ph");phc["slope"]=calibrationData.phSlope;phc["intercept"]=calibrationData.phIntercept;
+            if(calibrationData.phCalibratedAt>0)phc["calibratedAt"]=calibrationData.phCalibratedAt;
+            JsonObject orpc=cd.createNestedObject("orp");orpc["offset"]=calibrationData.orpOffset;
+            if(calibrationData.orpCalibratedAt>0)orpc["calibratedAt"]=calibrationData.orpCalibratedAt;
+            String cj; serializeJson(cd,cj); mqttManager->publish("calibration",cj,false);
         }
     }
-
-    unsigned long elapsed = millis() - loopStart;
-    int delayMs = cfg.loopDelayMs - (int)elapsed;
-    if (delayMs > 0) {
-        delay(delayMs);
-    } else if (delayMs < -100) {
-        static unsigned long lw = 0;
-        if (millis() - lw > 60000) {
-            log_w("Loop overrun: %lu ms (limit %d ms)", elapsed, cfg.loopDelayMs);
-            lw = millis();
-        }
-    }
+    unsigned long el = millis() - ls;
+    int d = cfg.loopDelayMs - (int)el;
+    if (d > 0) delay(d);
+    else if (d < -100) { static unsigned long lw=0; if(millis()-lw>60000){log_w("Loop overrun: %lu ms",el);lw=millis();} }
 }
