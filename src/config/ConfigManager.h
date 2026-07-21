@@ -8,7 +8,7 @@
 #define CONFIG_FILE "/config.json"
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
-#define CONFIG_VERSION 6  // minOnTimeSec/minOffTimeSec added to FilterPumpConfig; pump config unified
+#define CONFIG_VERSION 7  // filterPreRunDelayMin added to FilterPumpConfig
 #define WIFI_HOSTNAME_MAX 64
 #define MQTT_TOPIC_MAX 128
 #define STRING_BUF_SIZE 256
@@ -103,6 +103,7 @@ struct FilterPumpConfig {
     float maxDailyRuntimeMin = 1440.0;  // 24h = de facto unlimited
     int minOnTimeSec = 60;   // Taktschutz: minimale Einschaltdauer
     int minOffTimeSec = 300; // Taktschutz: minimale Ruhezeit (5 min)
+    int filterPreRunDelayMin = 5;  // Min. Filter-Vorlaufzeit bevor Chemie-Pumpen starten dürfen
 
     String toJson() const;
     static FilterPumpConfig fromJson(JsonVariantConst json);
