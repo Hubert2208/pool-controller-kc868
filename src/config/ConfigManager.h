@@ -6,7 +6,9 @@
 #include <LittleFS.h>
 
 #define CONFIG_FILE "/config.json"
+#define CALIBRATION_FILE "/calibration.json"
 #define CONFIG_JSON_SIZE 4096
+#define CALIBRATION_JSON_SIZE 1024
 #define MAX_RELAYS 8
 #define CONFIG_VERSION 7  // filterPreRunDelayMin added to FilterPumpConfig
 #define WIFI_HOSTNAME_MAX 64
@@ -117,6 +119,32 @@ struct RelayConfig {
 
     String toJson() const;
     static RelayConfig fromJson(JsonVariantConst json);
+};
+
+// ── Sensor Calibration Data (stored in separate calibration.json) ──
+
+struct CalibrationData {
+    // ── pH calibration (2-point: pH 7 + pH 4) ──
+    float phSlope = -3.5f;           // pH per volt (Nernst slope, negative)
+    float phIntercept = 7.0f;        // pH at 0V (zero-point offset)
+    float phVoltagePH7 = 0.0f;       // Raw voltage measured at pH 7.00 buffer
+    float phVoltagePH4 = 0.0f;       // Raw voltage measured at pH 4.01 buffer
+    unsigned long phCalibratedAt = 0; // Timestamp of last pH cal (epoch seconds)
+
+    // ── ORP calibration (single-point offset) ──
+    float orpOffset = 0.0f;          // mV correction offset
+    float orpReferenceMV = 0.0f;     // Known reference value used for cal
+    unsigned long orpCalibratedAt = 0; // Timestamp of last ORP cal (epoch seconds)
+
+    // ── Temperature compensation reference ──
+    float calTemperature = 25.0f;    // °C at calibration time (for Nernst correction)
+
+    String toJson() const;
+    static CalibrationData fromJson(JsonVariantConst json);
+
+    // Persist to/from separate LittleFS file (survives config reset)
+    bool save();
+    bool load();
 };
 
 struct AppConfig {
