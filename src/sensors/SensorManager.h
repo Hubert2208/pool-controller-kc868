@@ -8,6 +8,9 @@
 #include "../simulation/SensorSimulator.h"
 #include "../config/ConfigManager.h"
 
+class PHSensor;
+class ORPSensor;
+
 class SensorManager {
 public:
     SensorManager(ConfigManager& configManager);
@@ -26,6 +29,10 @@ public:
     bool isPHConnected() const;
     bool isORPConnected() const;
     bool isWaterTempConnected() const;
+
+    // Direct sensor access for calibration
+    PHSensor* getPHSensor() const;
+    ORPSensor* getORPSensor() const;
 
     SensorSimulator* getPHSimulator() { return _phSim; }
     SensorSimulator* getORPSimulator() { return _orpSim; }
