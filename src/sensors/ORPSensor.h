@@ -18,7 +18,6 @@ public:
     bool isConnected() const override { return _connected; }
 
     void setCalibration(float knownORP_mV);
-    float getCalibrationOffset() const { return _calOffset; }
 
 private:
     Adafruit_ADS1115 _ads;

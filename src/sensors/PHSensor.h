@@ -19,8 +19,6 @@ public:
 
     // Calibration: voltage -> pH conversion
     void setCalibration(float voltageAtPH7, float voltageAtPH4);
-    float getCalibrationSlope() const { return _calSlope; }
-    float getCalibrationIntercept() const { return _calIntercept; }
 
 private:
     Adafruit_ADS1115 _ads;
@@ -28,9 +26,6 @@ private:
     uint8_t _channel;
     float _calSlope;        // pH per volt (negative: pH drops as voltage rises)
     float _calIntercept;    // pH at 0V
-    float _voltagePH7;       // Measured voltage at pH 7.0
-    float _voltagePH4;       // Measured voltage at pH 4.0
-
     float readVoltage();
 };
 

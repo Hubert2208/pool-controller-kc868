@@ -19,7 +19,6 @@ public:
     // Set control direction: false = direct (output↑ when input↓),
     //                        true  = reverse (output↑ when input↑)
     void setReverseAction(bool reverse) { _reverseAction = reverse; }
-    bool getReverseAction() const { return _reverseAction; }
 
     // Compute output for given input and time step (seconds)
     // Returns the controller output
@@ -29,9 +28,6 @@ public:
     void reset();
 
     // Diagnostic accessors
-    float getKp() const { return _kp; }
-    float getKi() const { return _ki; }
-    float getKd() const { return _kd; }
     float getP() const { return _pTerm; }
     float getI() const { return _iTerm; }
     float getD() const { return _dTerm; }

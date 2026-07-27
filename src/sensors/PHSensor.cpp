@@ -8,10 +8,7 @@ PHSensor::PHSensor(uint8_t adsAddress, uint8_t channel)
     , _channel(channel)
     , _calSlope(-3.5f)          // typical pH electrode: ~-3.5 pH/V
     , _calIntercept(7.0f)       // 0V ≈ pH 7.0
-    , _voltagePH7(0.0f)
-    , _voltagePH4(0.0f)
 {
-}
 
 bool PHSensor::begin() {
     if (!_ads.begin(_adsAddress)) {
@@ -65,9 +62,6 @@ bool PHSensor::read() {
 }
 
 void PHSensor::setCalibration(float voltageAtPH7, float voltageAtPH4) {
-    _voltagePH7 = voltageAtPH7;
-    _voltagePH4 = voltageAtPH4;
-
     // Calculate slope: (7-4) / (V7 - V4)
     float voltageDiff = voltageAtPH7 - voltageAtPH4;
     if (fabs(voltageDiff) > 0.001f) {

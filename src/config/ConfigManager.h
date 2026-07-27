@@ -9,9 +9,6 @@
 #define CONFIG_JSON_SIZE 4096
 #define MAX_RELAYS 8
 #define CONFIG_VERSION 7  // filterPreRunDelayMin added to FilterPumpConfig
-#define WIFI_HOSTNAME_MAX 64
-#define MQTT_TOPIC_MAX 128
-#define STRING_BUF_SIZE 256
 
 // ── Defaults: ConfigDefaults.h ist die EINZIGE Datei für Werkseinstellungen.
 //    Struct-Initialisierer hier sind nur Fallback — in ConfigDefaults.h ändern!

@@ -33,7 +33,6 @@ public:
     bool hasDependentsOn() const;
 
     const char* getName() const { return _name; }
-    uint8_t getRelayChannel() const { return _relayChannel; }
     unsigned long getLastOnTime() const { return _lastOnTime; }  // When this pump last turned ON
 
 private:
