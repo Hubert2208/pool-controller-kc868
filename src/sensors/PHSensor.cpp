@@ -9,6 +9,7 @@ PHSensor::PHSensor(uint8_t adsAddress, uint8_t channel)
     , _calSlope(-3.5f)          // typical pH electrode: ~-3.5 pH/V
     , _calIntercept(7.0f)       // 0V ≈ pH 7.0
 {
+}
 
 bool PHSensor::begin() {
     if (!_ads.begin(_adsAddress)) {
