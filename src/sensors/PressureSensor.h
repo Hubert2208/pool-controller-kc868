@@ -20,7 +20,6 @@ public:
     // Backwash detection
     bool needsBackwash() const;
     void setBackwashThreshold(float bar);
-    float getBackwashThreshold() const { return _backwashThreshold; }
 
     // Calibration: voltage to pressure mapping
     void setPressureRange(float voltageAt0Bar, float voltageAtMaxBar, float maxPressureBar);

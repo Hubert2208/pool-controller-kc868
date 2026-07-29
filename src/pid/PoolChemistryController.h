@@ -31,9 +31,6 @@ public:
     PIDController& getPHPID() { return _phPID; }
     PIDController& getChlorinePID() { return _chlorinePID; }
 
-    float getLastPHOutput() const { return _lastPHOutput; }
-    float getLastChlorineOutput() const { return _lastChlorineOutput; }
-
     // Get state as JSON for MQTT publishing
     String getStateJSON();
 

@@ -36,9 +36,6 @@ public:
     // Turn all relays off
     void allOff();
 
-    // Number of relays
-    uint8_t getRelayCount() const { return KC868_A8_RELAY_COUNT; }
-
 private:
     // Write current state byte to PCF8574 over I2C
     void writePCF8574();

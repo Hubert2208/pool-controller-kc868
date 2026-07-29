@@ -18,12 +18,8 @@ public:
     // Get the current simulated value
     float getValue() const { return _currentValue; }
 
-    // Force a specific value
-    void setValue(float val) { _currentValue = val; }
-
     // Pump-aware simulation: pump ON → directed effect; pump OFF → natural drift
     void setPumpActive(bool active) { _pumpActive = active; }
-    bool isPumpActive() const { return _pumpActive; }
 
     // Set drift rates:
     //   naturalDriftPerHour: drift when pump is OFF (positive = rising, negative = falling)
