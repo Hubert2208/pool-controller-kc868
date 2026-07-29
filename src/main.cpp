@@ -94,6 +94,13 @@ void handleRoot() {
     html += ".pt-label{display:inline-block;width:70px}";
     html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center}";
     html += ".pt-note{color:#888;font-size:0.73em;margin:2px 0 6px 0}";
+    html += ".rt-label{display:inline-block;width:90px;text-align:right;margin-right:6px;color:#888;font-size:0.8em}";
+    html += ".rt-value{color:#0f0;font-weight:bold}";
+    html += ".rt-bad{color:#f44}";
+    html += ".progress-bg{background:#0a0a2e;border:1px solid #333;border-radius:4px;height:14px;margin:4px 0;overflow:hidden}";
+    html += ".progress-fill{height:100%;background:linear-gradient(90,#0af,#0f0);border-radius:4px;transition:width 0.5s}";
+    html += ".progress-fill.low{background:linear-gradient(90,#f80,#f44)}";
+    html += ".progress-fill.ok{background:linear-gradient(90,#0af,#0f0)}";
     html += "</style></head><body><h1>🏊 Pool Controller</h1>";
     html += "<div class='card'><h2>System</h2>";
     html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
@@ -137,6 +144,23 @@ void handleRoot() {
     if (phPumpCtrl) html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(), phPumpCtrl->getLastOnDuration() / 60000, phPumpCtrl->getRuntimeMinutes()) + "<br>";
     if (chlorinePumpCtrl) html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(), chlorinePumpCtrl->getLastOnDuration() / 60000, chlorinePumpCtrl->getRuntimeMinutes()) + "<br>";
     html += "</p></div>";
+    // ── Filter Pump Runtime Status ──
+    html += "<div class='card'><h2>⏱️ Filter Pump Runtime</h2><p style='font-size:0.8em;color:#aaa;margin:0 0 6px 0'>Required runtime is calculated from water temperature (T/2 × 60 min).</p>";
+    if (filterPumpCtrl && filterPumpLogic) {
+        float requiredMin = filterPumpLogic->getDailyRequiredMinutes();
+        unsigned long actualMin = filterPumpCtrl->getRuntimeMinutes();
+        int pct = (requiredMin > 0) ? (int)((actualMin / requiredMin) * 100.0f) : 0;
+        if (pct > 100) pct = 100;
+        const char* barClass = (pct >= 100) ? "ok" : "low";
+        const char* valClass = (pct >= 100) ? "" : " rt-bad";
+        html += "<div class='rt-row'><span class='rt-label'>Required:</span><span class='rt-value'>" + String((int)requiredMin) + " min</span></div>";
+        html += "<div class='rt-row'><span class='rt-label'>Today:</span><span class='rt-value'>" + String(actualMin) + " min</span></div>";
+        html += "<div class='rt-row'><span class='rt-label'>Progress:</span><span class='rt-value" + String(valClass) + "'>" + String(pct) + "%</span></div>";
+        html += "<div class='progress-bg'><div class='progress-fill " + String(barClass) + "' style='width:" + String(pct) + "%'></div></div>";
+    } else {
+        html += "<span class='rt-bad'>Filter pump logic not available</span>";
+    }
+    html += "</p></div>";
     html += "<div class='card'><h2>Relay Test</h2><p>";
     for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) html += relayButton(i, relayManager.getRelayState(i));
     html += "</p></div>";
@@ -165,7 +189,7 @@ void handleAPI() {
     doc["ph_setpoint"] = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
     doc["orp_setpoint"] = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
     JsonObject pumps = doc.createNestedObject("pumps");
-    if (filterPumpCtrl) { JsonObject f = pumps.createNestedObject("filter"); f["on"] = filterPumpCtrl->isOn(); f["current_min"] = filterPumpCtrl->getLastOnDuration() / 60000; f["today_min"] = filterPumpCtrl->getRuntimeMinutes(); }
+    if (filterPumpCtrl) { JsonObject f = pumps.createNestedObject("filter"); f["on"] = filterPumpCtrl->isOn(); f["current_min"] = filterPumpCtrl->getLastOnDuration() / 60000; f["today_min"] = filterPumpCtrl->getRuntimeMinutes(); f["required_runtime_min"] = filterPumpLogic ? filterPumpLogic->getDailyRequiredMinutes() : 0; }
     if (phPumpCtrl) { JsonObject p = pumps.createNestedObject("ph"); p["on"] = phPumpCtrl->isOn(); p["current_min"] = phPumpCtrl->getLastOnDuration() / 60000; p["today_min"] = phPumpCtrl->getRuntimeMinutes(); }
     if (chlorinePumpCtrl) { JsonObject c = pumps.createNestedObject("chlorine"); c["on"] = chlorinePumpCtrl->isOn(); c["current_min"] = chlorinePumpCtrl->getLastOnDuration() / 60000; c["today_min"] = chlorinePumpCtrl->getRuntimeMinutes(); }
     JsonArray relays = doc.createNestedArray("relays");
@@ -420,6 +444,7 @@ void loop() {
                 f["on"] = filterPumpCtrl->isOn();
                 f["runtime_today_min"] = filterPumpCtrl->getRuntimeMinutes();
                 f["last_on_duration_ms"] = filterPumpCtrl->getLastOnDuration();
+                f["required_runtime_min"] = filterPumpLogic ? filterPumpLogic->getDailyRequiredMinutes() : 0;
             }
             String pumpStates;
             serializeJson(pumpDoc, pumpStates);

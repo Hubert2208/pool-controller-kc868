@@ -17,6 +17,9 @@ public:
     // Calculate required daily runtime based on water temperature
     float calculateDailyRuntime(float waterTemp) const;
 
+    // Get the cached required daily runtime (updated every 5 min in update())
+    float getDailyRequiredMinutes() const { return _dailyRequiredMinutes; }
+
     // Check if current time is within the operating window
     bool isInOperatingWindow() const;
 
