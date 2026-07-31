@@ -71,109 +71,148 @@ void handleRoot() {
     AppConfig& cfg = configManager.get();
     String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
     html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<meta http-equiv='refresh' content='30'>";
+    html += "<script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>";
+    html += "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap' rel='stylesheet'>";
     html += "<style>";
-    html += "body{font-family:Arial,sans-serif;margin:10px;background:#1a1a2e;color:#eee}";
-    html += "h1{color:#0f0;font-size:1.3em;margin:8px 0}h2{color:#0af;font-size:1em;margin:6px 0}";
-    html += ".card{background:#16213e;border-radius:8px;padding:12px;margin:8px 0}";
-    html += ".value{font-size:1.3em;font-weight:bold;color:#0f0}.bad{color:#f44}";
-    html += ".btn-on{background:#0a0;color:#fff;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
-    html += ".btn-off{background:#444;color:#ccc;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer;margin:2px;min-width:60px}";
-    html += ".btn-on:hover{background:#0c0}.btn-off:hover{background:#666}";
-    html += ".relay-btn{font-size:0.75em;padding:4px 8px;margin:2px;min-width:52px}";
-    html += ".pump-label{display:inline-block;width:100px}.runtime{color:#888;font-size:0.75em;margin-left:6px}";
-    html += ".manual-badge{background:#f80;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
-    html += ".auto-badge{background:#0a0;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em}";
-    html += ".mode-btn{background:#f80;color:#000;border:none;padding:6px 16px;border-radius:4px;font-weight:bold;cursor:pointer}.mode-btn.auto{background:#0a0}";
-    html += ".sp-label{display:inline-block;width:80px;text-align:right;margin-right:8px}";
+    html += "*{margin:0;padding:0;box-sizing:border-box}";
+    html += "body{font-family:'Inter',sans-serif;background:#0f0f23;color:#e0e0e0;margin:12px;font-size:14px;line-height:1.4}";
+    html += "h1{color:#00d6ff;font-size:1.4em;margin-bottom:4px}h2{color:#00d6ff;font-size:1em;margin:4px 0 8px 0}";
+    html += ".grid{display:grid;gap:12px}";
+    html += "@media(min-width:768px){.grid{grid-template-columns:1fr 1fr}}";
+    html += ".card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px;margin:8px 0;backdrop-filter:blur(4px)}";
+    html += ".value{color:#00ff88;font-weight:600}";
+    html += ".bad{color:#ff4757}";
+    html += ".btn{display:inline-flex;align-items:center;justify-content:center;border:none;padding:6px 16px;border-radius:8px;font-weight:600;cursor:pointer;margin:2px;min-width:56px;font-size:0.8em;transition:all 0.2s}";
+    html += ".btn-on{background:#00c851;color:#000}";
+    html += ".btn-off{background:#3742fa;color:#fff}";
+    html += ".btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}";
     html += ".sp-range{width:140px;margin:0 8px;vertical-align:middle}";
-    html += ".sp-val{display:inline-block;width:45px;color:#0f0;font-weight:bold}";
-    html += ".sp-apply{background:#0af;color:#000;border:none;padding:6px 20px;border-radius:4px;font-weight:bold;cursor:pointer;margin-top:8px}";
-    html += ".sp-apply:hover{background:#0cf}.sp-row{margin:4px 0}";
-    html += ".sp-saved{color:#0f0;font-size:0.8em;margin-left:10px;display:none}";
-    html += ".pt-row{margin:4px 0;font-size:0.85em}";
-    html += ".pt-label{display:inline-block;width:70px}";
-    html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center}";
-    html += ".pt-note{color:#888;font-size:0.73em;margin:2px 0 6px 0}";
-    html += ".rt-label{display:inline-block;width:90px;text-align:right;margin-right:6px;color:#888;font-size:0.8em}";
-    html += ".rt-value{color:#0f0;font-weight:bold}";
-    html += ".rt-bad{color:#f44}";
+    html += ".sp-val{color:#00ff88;font-weight:600;width:45px;display:inline-block}";
+    html += ".sp-apply{background:#00d6ff;color:#000;border:none;padding:6px 20px;border-radius:6px;font-weight:600;cursor:pointer;font-size:0.85em}";
+    html += ".sp-apply:hover{background:#00e6ff}";
+    html += ".sp-row{display:flex;align-items:center;margin:6px 0}";
+    html += ".sp-label{display:inline-block;width:80px;text-align:right;margin-right:8px;color:#888;font-size:0.8em}";
+    html += ".sp-saved{color:#00ff88;font-size:0.75em;margin-left:10px}";
+    html += ".pt-row{display:flex;align-items:center;margin:4px 0;font-size:0.85em}";
+    html += ".pt-label{display:inline-block;width:70px;color:#888}";
+    html += ".pt-input{background:#0a0a2e;color:#0f0;border:1px solid #333;padding:2px 4px;border-radius:3px;width:55px;text-align:center;font-size:0.8em}";
+    html += ".pt-note{color:#888;font-size:0.73em;margin:4px 0 6px 0}";
+    html += ".rt-label{display:inline-block;width:80px;text-align:right;margin-right:6px;color:#888;font-size:0.8em}";
+    html += ".rt-value{color:#00ff88;font-weight:bold}";
+    html += ".rt-bad{color:#ff4757}";
     html += ".progress-bg{background:#0a0a2e;border:1px solid #333;border-radius:4px;height:14px;margin:4px 0;overflow:hidden}";
-    html += ".progress-fill{height:100%;background:linear-gradient(90,#0af,#0f0);border-radius:4px;transition:width 0.5s}";
-    html += ".progress-fill.low{background:linear-gradient(90,#f80,#f44)}";
-    html += ".progress-fill.ok{background:linear-gradient(90,#0af,#0f0)}";
-    html += "</style></head><body><h1>🏊 Pool Controller</h1>";
+    html += ".progress-fill{height:100%;width:0;background:linear-gradient(90,#00d6ff,#00ff88);border-radius:2px}";
+    html += ".progress-fill.low{background:linear-gradient(90,#ff8c00,#ff4757)}";
+    html += ".progress-fill.ok{background:linear-gradient(90,#00d6ff,#00ff88)}";
+    html += ".pump-label{display:inline-block;width:80px}";
+    html += ".runtime{color:#888;font-size:0.75em;margin-left:6px}";
+    html += ".badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:0.75em;font-weight:600}";
+    html += ".badge-auto{background:#00c851;color:#000}";
+    html += ".badge-manual{background:#ff8c00;color:#000}";
+    html += ".status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}";
+    html += ".dot-ok{background:#00ff88}";
+    html += ".dot-bad{background:#ff4757}";
+    html += ".hidden{display:none}";
+    html += "</style>";
+    html += "</head><body>";
+    html += "<div id='app'>";
+    // Header
+    html += "<div class='card'><h1> Pool Controller</h1>";
+    html += "<p><span class='status-dot' :class=\"apiData.wifi?'dot-ok':'dot-bad'\"></span>{{ apiData.wifi?'WiFi OK':'WiFi OFF' }} | ";
+    html += "<span class='status-dot' :class=\"apiData.mqtt?'dot-ok':'dot-bad'\"></span>{{ apiData.mqtt?'MQTT OK':'MQTT OFF' }} | ";
+    html += "IP: {{ apiData.ip || '-' }} | <span class='status-dot' :class=\"apiData.manual_mode?'dot-bad':'dot-ok'\"></span>{{ apiData.manual_mode?'MANUAL':'AUTO' }}</p>";
+    html += "</div>";
+    // System
     html += "<div class='card'><h2>System</h2>";
-    html += "<p>Mode: <span id='sys-mode'>" + String(manualMode ? "<span class='manual-badge'>🔧 MANUAL</span>" : "<span class='auto-badge'>🤖 AUTO</span>") + "</span></p>";
-    html += "<p>Uptime: <span id='sys-uptime'>" + String(millis() / 1000 / 60) + "</span> min | WiFi: <span id='sys-wifi'>" + String(WiFi.isConnected() ? "✅" : "❌") + "</span> | MQTT: <span id='sys-mqtt'>" + String(mqttManager && mqttManager->isConnected() ? "✅" : "❌") + "</span> | IP: " + (WiFi.isConnected() ? WiFi.localIP().toString() : String(AP_SSID)) + "</p></div>";
+    html += "<p>Uptime: {{ Math.floor(apiData.uptime_ms/60000) }} min</p>";
+    html += "<p>Free Heap: {{ apiData.free_heap }} bytes</p></div>";
+    // Sensors
     html += "<div class='card'><h2>Sensors</h2><p>";
-    if (sensorManager) {
-        html += "pH: <span class='value' id='val-ph'>" + String(sensorManager->getPH(), 2) + "</span> pH";
-        html += sensorManager->isPHConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| ORP: <span class='value' id='val-orp'>" + String(sensorManager->getORP(), 0) + "</span> mV";
-        html += sensorManager->isORPConnected() ? " ✅ " : " <span class='bad'>⚠sim</span> ";
-        html += "| Water: <span class='value' id='val-water'>" + String(sensorManager->getWaterTemperature(), 1) + "</span>°C";
-        html += "| Air: <span class='value' id='val-air'>" + String(sensorManager->getAirTemperature(), 1) + "</span>°C";
-        html += "| Pressure: <span class='value' id='val-pressure'>" + String(sensorManager->getFilterPressure(), 2) + "</span> bar";
-    }
+    html += "pH: <span class='value'>{{ formatNum(apiData.ph, 2) }}</span> pH | ";
+    html += "ORP: <span class='value'>{{ formatNum(apiData.orp, 0) }}</span> mV | ";
+    html += "Water: <span class='value'>{{ formatNum(apiData.water_temp, 1) }}</span>C | ";
+    html += "Air: <span class='value'>{{ formatNum(apiData.air_temp, 1) }}</span>C | ";
+    html += "Pressure: <span class='value'>{{ formatNum(apiData.filter_pressure, 2) }}</span> bar";
     html += "</p></div>";
-    float phSP = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
-    float orpSP = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
-    html += "<div class='card'><h2>🎯 Chemistry Setpoints</h2>";
-    html += "<div class='sp-row'><span class='sp-label'>pH Target:</span><input type='range' class='sp-range' id='sp-ph-range' min='6.0' max='8.0' step='0.1' value='" + String(phSP, 1) + "' oninput=\"document.getElementById('sp-ph-val').textContent=this.value\"><span class='sp-val' id='sp-ph-val'>" + String(phSP, 1) + "</span> pH</div>";
-    html += "<div class='sp-row'><span class='sp-label'>ORP Target:</span><input type='range' class='sp-range' id='sp-orp-range' min='200' max='900' step='10' value='" + String((int)orpSP) + "' oninput=\"document.getElementById('sp-orp-val').textContent=this.value\"><span class='sp-val' id='sp-orp-val'>" + String((int)orpSP) + "</span> mV</div>";
-    html += "<button class='sp-apply' onclick=\"applySetpoints(event)\">Apply Setpoints</button><span class='sp-saved' id='sp-saved'>✅ Saved!</span>";
-    html += "<p style='font-size:0.7em;color:#888;margin-top:6px'>Changes take effect immediately.</p></div>";
-    html += "<div class='card'><h2>⏱️ Pump Timing (Anti-Short-Cycle)</h2>";
-    html += "<p style='font-size:0.75em;color:#888;margin:0 0 8px 0'>Pump won't start until min OFF time elapsed; won't stop until min ON time elapsed.</p>";
-    html += pumpTimingRow("ph", "pH Pump", cfg.phPump.minOnTimeSec, cfg.phPump.minOffTimeSec, cfg.phPump.maxDailyRuntimeMin);
-    html += pumpTimingRow("cl", "Chlorine", cfg.chlorinePump.minOnTimeSec, cfg.chlorinePump.minOffTimeSec, cfg.chlorinePump.maxDailyRuntimeMin);
-    html += pumpTimingRow("filter", "Filter", cfg.filterPump.minOnTimeSec, cfg.filterPump.minOffTimeSec, cfg.filterPump.maxDailyRuntimeMin);
-    // ── Filter pre-run delay ──
-    html += "<div class='pt-row'><span class='pt-label'>🔒 Pre-Run:</span>";
-    html += " Filter must run <input type='number' class='pt-input' style='width:55px' id='ptd-prerun' value='" + String(cfg.filterPump.filterPreRunDelayMin) + "' min='1' max='60' step='1'> min before pH/Cl pumps start";
-    html += "</div>";
-    html += "<p class='pt-note'>⚠️ Chemistry pumps wait for filter pre-run delay after each filter restart.</p>";
-    html += "<button class='sp-apply' onclick=\"applyPumpTiming(event)\">Apply Timing</button><span class='sp-saved' id='pt-saved'>✅ Saved!</span>";
-    html += "</div>";
+    // Chemistry Setpoints
+    html += "<div class='card'><h2>Chemistry Setpoints</h2>";
+    html += "<div class='sp-row'><span class='sp-label'>pH Target:</span>";
+    html += "<input type='range' class='sp-range' min='6.0' max='8.0' step='0.1' v-model.number='setpoints.ph'>";
+    html += "<span class='sp-val'>{{ setpoints.ph.toFixed(1) }}</span> pH</div>";
+    html += "<div class='sp-row'><span class='sp-label'>ORP Target:</span>";
+    html += "<input type='range' class='sp-range' min='200' max='900' step='10' v-model.number='setpoints.orp'>";
+    html += "<span class='sp-val'>{{ setpoints.orp }} mV</span></div>";
+    html += "<button class='sp-apply' @click='applySetpoints'>Apply</button>";
+    html += "<span class='sp-saved' v-show='savedMsg'>{{ savedMsg }}</span></div>";
+    // Control Mode
     html += "<div class='card'><h2>Control Mode</h2><p>";
-    if (manualMode) html += "<button class='mode-btn auto' onclick=\"fetch('/api/manual?mode=0').then(r=>r.json()).then(d=>location.reload())\">Return to AUTO Mode</button>";
-    else html += "<button class='mode-btn' onclick=\"fetch('/api/manual?mode=1').then(r=>r.json()).then(d=>location.reload())\">Switch to MANUAL Mode</button>";
+    html += "<button class='btn' :class=\"apiData.manual_mode?'btn-off':'btn-on'\" @click='setMode(false)'>AUTO Mode</button> ";
+    html += "<button class='btn' :class=\"apiData.manual_mode?'btn-on':'btn-off'\" @click='setMode(true)'>MANUAL Mode</button>";
     html += "</p></div>";
-    html += "<div class='card'><h2>Pump Control</h2><p>";
-    if (filterPumpCtrl) html += pumpButton("filter", "Filter", filterPumpCtrl->isOn(), filterPumpCtrl->getLastOnDuration() / 60000, filterPumpCtrl->getRuntimeMinutes()) + "<br>";
-    if (phPumpCtrl) html += pumpButton("ph", "pH Pump", phPumpCtrl->isOn(), phPumpCtrl->getLastOnDuration() / 60000, phPumpCtrl->getRuntimeMinutes()) + "<br>";
-    if (chlorinePumpCtrl) html += pumpButton("chlorine", "Chlorine", chlorinePumpCtrl->isOn(), chlorinePumpCtrl->getLastOnDuration() / 60000, chlorinePumpCtrl->getRuntimeMinutes()) + "<br>";
-    html += "</p></div>";
-    // ── Filter Pump Runtime Status ──
-    html += "<div class='card'><h2>⏱️ Filter Pump Runtime</h2><p style='font-size:0.8em;color:#aaa;margin:0 0 6px 0'>Required runtime is calculated from water temperature (T/2 × 60 min).</p>";
-    if (filterPumpCtrl && filterPumpLogic) {
-        float requiredMin = filterPumpLogic->getDailyRequiredMinutes();
-        unsigned long actualMin = filterPumpCtrl->getRuntimeMinutes();
-        int pct = (requiredMin > 0) ? (int)((actualMin / requiredMin) * 100.0f) : 0;
-        if (pct > 100) pct = 100;
-        const char* barClass = (pct >= 100) ? "ok" : "low";
-        const char* valClass = (pct >= 100) ? "" : " rt-bad";
-        html += "<div class='rt-row'><span class='rt-label'>Required:</span><span class='rt-value'>" + String((int)requiredMin) + " min</span></div>";
-        html += "<div class='rt-row'><span class='rt-label'>Today:</span><span class='rt-value'>" + String(actualMin) + " min</span></div>";
-        html += "<div class='rt-row'><span class='rt-label'>Progress:</span><span class='rt-value" + String(valClass) + "'>" + String(pct) + "%</span></div>";
-        html += "<div class='progress-bg'><div class='progress-fill " + String(barClass) + "' style='width:" + String(pct) + "%'></div></div>";
-    } else {
-        html += "<span class='rt-bad'>Filter pump logic not available</span>";
-    }
-    html += "</p></div>";
-    html += "<div class='card'><h2>Relay Test</h2><p>";
-    for (int i = 0; i < KC868_A8_RELAY_COUNT; i++) html += relayButton(i, relayManager.getRelayState(i));
-    html += "</p></div>";
+    // Pump Control (FIXED: <p> -> <div> wrapping <div> v-if elements)
+    html += "<div class='card'><h2>Pump Control</h2><div>";
+    html += "<div v-if='pumps.filter'><button class='btn' :class=\"pumps.filter.on?'btn-on':'btn-off'\" @click=\"togglePump('filter')\">Filter {{ pumps.filter.on?'ON':'OFF' }}</button> ";
+    html += "<span class='runtime'>({{ pumps.filter.current_min }}m / {{ pumps.filter.today_min }}m today)</span></div>";
+    html += "<div v-if='pumps.ph'><button class='btn' :class=\"pumps.ph.on?'btn-on':'btn-off'\" @click=\"togglePump('ph')\">pH {{ pumps.ph.on?'ON':'OFF' }}</button> ";
+    html += "<span class='runtime'>({{ pumps.ph.current_min }}m / {{ pumps.ph.today_min }}m today)</span></div>";
+    html += "<div v-if='pumps.chlorine'><button class='btn' :class=\"pumps.chlorine.on?'btn-on':'btn-off'\" @click=\"togglePump('chlorine')\">Cl {{ pumps.chlorine.on?'ON':'OFF' }}</button> ";
+    html += "<span class='runtime'>({{ pumps.chlorine.current_min }}m / {{ pumps.chlorine.today_min }}m today)</span></div>";
+    html += "</div></div>";
+    // Filter Pump Runtime (FIXED: <p> -> <div> wrapping <div> rt-row elements)
+    html += "<div class='card'><h2>Filter Pump Runtime</h2>";
+    html += "<p style='font-size:0.8em;color:#aaa'>Required: T/2 x 60 min</p><div>";
+    html += "<div class='rt-row'><span class='rt-label'>Required:</span><span class='rt-value'>{{ requiredRuntime }} min</span></div>";
+    html += "<div class='rt-row'><span class='rt-label'>Today:</span><span class='rt-value'>{{ actualRuntime }} min</span></div>";
+    html += "<div class='rt-row'><span class='rt-label'>Progress:</span>";
+    html += "<span class='rt-value' :class=\"progressBadClass\">{{ progressPct }}%</span></div>";
+    html += "<div class='progress-bg'><div class='progress-fill' :class=\"progressFillClass\" :style=\"progressStyle\"></div></div>";
+    html += "</div></div>";
+    // Relay Test (FIXED: <p> -> <div> wrapping <div> v-for element)
+    html += "<div class='card'><h2>Relay Test</h2><div>";
+    html += "<div v-for='(state, i) in relays' :key='i'>";
+    html += "<button class='btn' :class=\"state?'btn-on':'btn-off'\" @click='toggleRelay(i)'>R{{ i }} {{ state?'ON':'OFF' }}</button></div>";
+    html += "</div></div>";
+    // Chemistry Status
     html += "<div class='card'><h2>Chemistry Status</h2><p>";
-    if (chemistryController) { html += "pH Control: " + String(chemistryController->isPHEnabled() ? "✅ ON" : "❌ OFF"); html += " | Chlorine Control: " + String(chemistryController->isChlorineEnabled() ? "✅ ON" : "❌ OFF"); }
-    html += "</p></div>";
-    html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' style='color:#f44;text-decoration:none'>🛑 Emergency All Off</a></p></div>";
+    html += "pH Control: <span :class=\"phEnabled?'value':'bad'\">{{ phEnabled?'ON':'OFF' }}</span> | ";
+    html += "Chlorine Control: <span :class=\"clEnabled?'value':'bad'\">{{ clEnabled?'ON':'OFF' }}</span></p></div>";
+    // Quick Actions
+    html += "<div class='card'><h2>Quick Actions</h2><p><a href='/api/alloff' class='bad' style='text-decoration:none'>All Off</a></p></div>";
+    // CRITICAL: Close #app div BEFORE <script> so <script> stays OUTSIDE Vue template
+    // Without this, Vue's innerHTML includes JS code, causing compileToFunction SyntaxError
+    html += "</div>";
     html += "<script>";
-    html += "function applySetpoints(e){var ph=document.getElementById('sp-ph-range').value;var orp=document.getElementById('sp-orp-range').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/setpoint?ph='+encodeURIComponent(ph)+'&orp='+encodeURIComponent(orp)).then(r=>r.json()).then(d=>{btn.textContent='Apply Setpoints';btn.disabled=false;var s=document.getElementById('sp-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Setpoints';btn.disabled=false})}";
-    html += "function applyPumpTiming(e){var phOn=document.getElementById('pto-ph').value;var phOff=document.getElementById('ptf-ph').value;var clOn=document.getElementById('pto-cl').value;var clOff=document.getElementById('ptf-cl').value;var fOn=document.getElementById('pto-filter').value;var fOff=document.getElementById('ptf-filter').value;var btn=e.target;btn.textContent='Saving...';btn.disabled=true;fetch('/api/pump/timing?ph_on='+phOn+'&ph_off='+phOff+'&cl_on='+clOn+'&cl_off='+clOff+'&filter_on='+fOn+'&filter_off='+fOff+'&ph_day='+document.getElementById('ptd-ph').value+'&cl_day='+document.getElementById('ptd-cl').value+'&filter_day='+document.getElementById('ptd-filter').value+'&filter_prerun='+document.getElementById('ptd-prerun').value).then(r=>r.json()).then(d=>{btn.textContent='Apply Timing';btn.disabled=false;var s=document.getElementById('pt-saved');s.style.display='inline';setTimeout(function(){s.style.display='none'},2500)}).catch(function(){btn.textContent='Apply Timing';btn.disabled=false})}";
+    html += "const api = Vue.createApp({";
+    html += "data(){return {";
+    html += "apiData:{},";
+    html += "setpoints:{ph:7.2,orp:750},";
+    html += "savedMsg:'',fetchError:''";
+    html += "}}";
+    html += ",computed:{";
+    html += "pumps(){return this.apiData?.pumps || {}},";
+    html += "relays(){return this.apiData?.relays || []},";
+    html += "phEnabled(){return this.apiData?.ph_enabled || false},";
+    html += "clEnabled(){return this.apiData?.cl_enabled || false},";
+    html += "requiredRuntime(){const r=this.apiData?.pumps?.filter?.required_runtime_min||0;return Math.round(r)},";
+    html += "actualRuntime(){return this.apiData?.pumps?.filter?.today_min || 0},";
+    html += "progressPct(){const r=this.requiredRuntime,a=this.actualRuntime;return r>0?Math.max(1,Math.round((a/r)*100)):0},progressBadClass(){return this.progressPct>=100?'':'rt-bad'},progressFillClass(){return this.progressPct>=100?'ok':'low'},progressStyle(){return{width:this.progressPct+'%',minWidth:this.actualRuntime>=1?'4px':'0'}}";
+    html += "}";
+    html += ",methods:{";
+    html += "async fetchApi(){try{const r=await fetch('/api');this.apiData=await r.json();if(this.apiData.ph_setpoint!==undefined)this.setpoints.ph=this.apiData.ph_setpoint;if(this.apiData.orp_setpoint!==undefined)this.setpoints.orp=this.apiData.orp_setpoint;}catch(e){console.error('fetchApi error:',e);this.fetchError=e.message;}},";
+    html += "formatNum(v,d){return v!=null?v.toFixed(d):'-'},";
+    html += "async applySetpoints(){this.savedMsg='Saving...';await fetch('/api/setpoint?ph='+this.setpoints.ph+'&orp='+this.setpoints.orp);this.savedMsg='Saved!';setTimeout(()=>this.savedMsg='',2000);this.fetchApi();},";
+    html += "async setMode(m){await fetch('/api/manual?mode='+(m?1:0));this.fetchApi();},";
+    html += "async togglePump(id){const p=this.pumps[id];if(!p)return;await fetch('/api/pump/set?id='+id+'&state='+(p.on?0:1));this.fetchApi();},";
+    html += "async toggleRelay(ch){await fetch('/api/relay/set?channel='+ch+'&state='+(!this.relays[ch]?1:0));this.fetchApi();},";
+    html += "async allOff(){await fetch('/api/alloff');this.fetchApi();}";
+    html += "}";
+    html += ",mounted(){this.fetchApi();setInterval(()=>this.fetchApi(),15000)}";
+    html += "});";
+    html += "api.mount('#app');";
     html += "</script>";
-    html += "<p style='color:#666;font-size:0.75em'>Pool Controller v1.0.0 | ESP32 KC868-A8</p></body></html>";
-    webServer.send(200, "text/html", html);
+    html += "</body></html>";
+    webServer.send(200, "text/html; charset=utf-8", html);
 }
 
 void handleAPI() {
@@ -188,6 +227,9 @@ void handleAPI() {
     doc["filter_pressure"] = sensorManager ? sensorManager->getFilterPressure() : 0;
     doc["ph_setpoint"] = chemistryController ? chemistryController->getPHPID().getSetpoint() : cfg.phPID.setpoint;
     doc["orp_setpoint"] = chemistryController ? chemistryController->getChlorinePID().getSetpoint() : cfg.chlorinePID.setpoint;
+    doc["ip"] = WiFi.isConnected() ? WiFi.localIP().toString() : String("0.0.0.0");
+    doc["ph_enabled"] = chemistryController ? chemistryController->isPHEnabled() : false;
+    doc["cl_enabled"] = chemistryController ? chemistryController->isChlorineEnabled() : false;
     JsonObject pumps = doc.createNestedObject("pumps");
     if (filterPumpCtrl) { JsonObject f = pumps.createNestedObject("filter"); f["on"] = filterPumpCtrl->isOn(); f["current_min"] = filterPumpCtrl->getLastOnDuration() / 60000; f["today_min"] = filterPumpCtrl->getRuntimeMinutes(); f["required_runtime_min"] = filterPumpLogic ? filterPumpLogic->getDailyRequiredMinutes() : 0; }
     if (phPumpCtrl) { JsonObject p = pumps.createNestedObject("ph"); p["on"] = phPumpCtrl->isOn(); p["current_min"] = phPumpCtrl->getLastOnDuration() / 60000; p["today_min"] = phPumpCtrl->getRuntimeMinutes(); }
@@ -256,7 +298,7 @@ void handleAPIPumpTiming() {
     if (webServer.hasArg("ph_day")) { float v = webServer.arg("ph_day").toFloat(); if (applyDaily(v, cfg.phPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
     if (webServer.hasArg("cl_day")) { float v = webServer.arg("cl_day").toFloat(); if (applyDaily(v, cfg.chlorinePump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
     if (webServer.hasArg("filter_day")) { float v = webServer.arg("filter_day").toFloat(); if (applyDaily(v, cfg.filterPump.maxDailyRuntimeMin, 1, 1440)) changed = true; }
-    // ── Filter pre-run delay ──
+    // Filter pre-run delay
     if (webServer.hasArg("filter_prerun")) { int v = webServer.arg("filter_prerun").toInt(); if (applyTiming(v, cfg.filterPump.filterPreRunDelayMin, 1, 60)) changed = true; }
 
     if (changed) {
@@ -319,20 +361,20 @@ void handleMQTTCommand(const char* topic, const String& payload) {
     else if (t == base + "all_off") relayManager.allOff();
     else if (t == base + "reset_config") { if (payload == "confirm") { configManager.get() = AppConfig(); configManager.save(); delay(1000); ESP.restart(); } }
     else if (t == base + "restart") { if (payload == "confirm") { delay(500); ESP.restart(); } }
-    // ── Individual pump timing commands (used by HA autodiscovery number entities) ──
+    // Individual pump timing commands
     else if (t == base + "ph_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.phPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "ph_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.phPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "cl_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.chlorinePump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "cl_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.chlorinePump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "filter_pump_min_on")  { int v = payload.toInt(); if (v >= 1 && v <= 3600) { cfg.filterPump.minOnTimeSec = v; configManager.save(); applyPumpConfig(); } }
     else if (t == base + "filter_pump_min_off") { int v = payload.toInt(); if (v >= 1 && v <= 7200) { cfg.filterPump.minOffTimeSec = v; configManager.save(); applyPumpConfig(); } }
-    // ── Individual daily limit commands ──
+    // Individual daily limit commands
     else if (t == base + "ph_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.phPump.maxDailyRuntimeMin = v; configManager.save(); } }
     else if (t == base + "cl_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.chlorinePump.maxDailyRuntimeMin = v; configManager.save(); } }
     else if (t == base + "filter_pump_max_day")  { float v = payload.toFloat(); if (v >= 1 && v <= 1440) { cfg.filterPump.maxDailyRuntimeMin = v; configManager.save(); } }
-    // ── Filter pre-run delay ──
+    // Filter pre-run delay
     else if (t == base + "filter_prerun_delay") { int v = payload.toInt(); if (v >= 1 && v <= 60) { cfg.filterPump.filterPreRunDelayMin = v; configManager.save(); applyPumpConfig(); log_i("MQTT: filter pre-run delay set to %d min", v); } }
-    // ── Bulk pump timing (JSON) ──
+    // Bulk pump timing (JSON)
     else if (t == base + "pump_timing") {
         StaticJsonDocument<256> doc;
         if (deserializeJson(doc, payload) == DeserializationError::Ok) {
@@ -368,7 +410,6 @@ void setup() {
     chlorinePumpCtrl = new PumpController(relayManager, cfg.chlorinePump.relayChannel, "Chlorine Pump"); chlorinePumpCtrl->begin();
     filterPumpCtrl = new PumpController(relayManager, cfg.filterPump.relayChannel, "Filter Pump"); filterPumpCtrl->begin();
 
-    // Apply anti-short-cycle timing from pump config (not PID params)
     applyPumpConfig();
 
     filterPumpLogic = new FilterPumpLogic(configManager, *filterPumpCtrl); filterPumpLogic->begin();
@@ -383,7 +424,7 @@ void setup() {
 
     mqttManager = new MQTTManager(configManager); mqttManager->begin(); mqttManager->setCommandCallback(handleMQTTCommand);
     systemReady = true;
-    log_i("═══ System ready (%lu ms) ═══", millis());
+    log_i("System ready (%lu ms)", millis());
 }
 
 void loop() {
@@ -398,76 +439,27 @@ void loop() {
 
     AppConfig& cfg = configManager.get();
 
-    // MQTT State Publishing — matches HA Discovery value_template paths
     if (mqttManager && mqttManager->isConnected() && systemReady) {
         unsigned long now = millis();
         if (now - lastSensorPublish >= SENSOR_PUBLISH_INTERVAL) {
             lastSensorPublish = now;
             log_i("MQTT: publishing sensor states");
+            if (sensorManager) mqttManager->publish("ph", String(sensorManager->getPH(), 2), false);
+            if (sensorManager) mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
+            if (chemistryController) mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
+            if (filterPumpLogic) mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
 
-            // Dedicated raw-value topics (no JSON parsing needed by HA)
-            if (sensorManager)
-                mqttManager->publish("ph", String(sensorManager->getPH(), 2), false);
-
-            // Composite JSON topics (multiple values per topic)
-            // Sensor states via SensorManager::getAllStateJSON()
-            if (sensorManager)
-                mqttManager->publish("sensors", sensorManager->getAllStateJSON(), false);
-
-            // Chemistry controller state via PoolChemistryController::getStateJSON()
-            if (chemistryController)
-                mqttManager->publish("chemistry", chemistryController->getStateJSON(), false);
-
-            // Filter pump logic state via FilterPumpLogic::getStateJSON()
-            if (filterPumpLogic)
-                mqttManager->publish("filter", filterPumpLogic->getStateJSON(), false);
-
-            // Pump runtime states
             StaticJsonDocument<256> pumpDoc;
-            if (phPumpCtrl) {
-                JsonObject ph = pumpDoc.createNestedObject("ph_pump");
-                ph["name"] = phPumpCtrl->getName();
-                ph["on"] = phPumpCtrl->isOn();
-                ph["runtime_today_min"] = phPumpCtrl->getRuntimeMinutes();
-                ph["last_on_duration_ms"] = phPumpCtrl->getLastOnDuration();
-            }
-            if (chlorinePumpCtrl) {
-                JsonObject cl = pumpDoc.createNestedObject("chlorine_pump");
-                cl["name"] = chlorinePumpCtrl->getName();
-                cl["on"] = chlorinePumpCtrl->isOn();
-                cl["runtime_today_min"] = chlorinePumpCtrl->getRuntimeMinutes();
-                cl["last_on_duration_ms"] = chlorinePumpCtrl->getLastOnDuration();
-            }
-            if (filterPumpCtrl) {
-                JsonObject f = pumpDoc.createNestedObject("filter_pump");
-                f["name"] = filterPumpCtrl->getName();
-                f["on"] = filterPumpCtrl->isOn();
-                f["runtime_today_min"] = filterPumpCtrl->getRuntimeMinutes();
-                f["last_on_duration_ms"] = filterPumpCtrl->getLastOnDuration();
-                f["required_runtime_min"] = filterPumpLogic ? filterPumpLogic->getDailyRequiredMinutes() : 0;
-            }
-            String pumpStates;
-            serializeJson(pumpDoc, pumpStates);
-            mqttManager->publish("pumps", pumpStates, false);
+            if (phPumpCtrl) { JsonObject ph = pumpDoc.createNestedObject("ph_pump"); ph["name"] = phPumpCtrl->getName(); ph["on"] = phPumpCtrl->isOn(); ph["runtime_today_min"] = phPumpCtrl->getRuntimeMinutes(); ph["last_on_duration_ms"] = phPumpCtrl->getLastOnDuration(); }
+            if (chlorinePumpCtrl) { JsonObject cl = pumpDoc.createNestedObject("chlorine_pump"); cl["name"] = chlorinePumpCtrl->getName(); cl["on"] = chlorinePumpCtrl->isOn(); cl["runtime_today_min"] = chlorinePumpCtrl->getRuntimeMinutes(); cl["last_on_duration_ms"] = chlorinePumpCtrl->getLastOnDuration(); }
+            if (filterPumpCtrl) { JsonObject f = pumpDoc.createNestedObject("filter_pump"); f["name"] = filterPumpCtrl->getName(); f["on"] = filterPumpCtrl->isOn(); f["runtime_today_min"] = filterPumpCtrl->getRuntimeMinutes(); f["last_on_duration_ms"] = filterPumpCtrl->getLastOnDuration(); f["required_runtime_min"] = filterPumpLogic ? filterPumpLogic->getDailyRequiredMinutes() : 0; }
+            String pumpStates; serializeJson(pumpDoc, pumpStates); mqttManager->publish("pumps", pumpStates, false);
 
-            // Pump timing config state (for HA autodiscovery number entities)
             StaticJsonDocument<192> timingDoc;
-            JsonObject tph = timingDoc.createNestedObject("ph");
-            tph["minOn"] = cfg.phPump.minOnTimeSec;
-            tph["minOff"] = cfg.phPump.minOffTimeSec;
-            tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
-            JsonObject tcl = timingDoc.createNestedObject("chlorine");
-            tcl["minOn"] = cfg.chlorinePump.minOnTimeSec;
-            tcl["minOff"] = cfg.chlorinePump.minOffTimeSec;
-            tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
-            JsonObject tf = timingDoc.createNestedObject("filter");
-            tf["minOn"] = cfg.filterPump.minOnTimeSec;
-            tf["minOff"] = cfg.filterPump.minOffTimeSec;
-            tf["maxDailyMin"] = cfg.filterPump.maxDailyRuntimeMin;
-            tf["preRunDelay"] = cfg.filterPump.filterPreRunDelayMin;
-            String timingJson;
-            serializeJson(timingDoc, timingJson);
-            mqttManager->publish("pump_config", timingJson, false);
+            JsonObject tph = timingDoc.createNestedObject("ph"); tph["minOn"] = cfg.phPump.minOnTimeSec; tph["minOff"] = cfg.phPump.minOffTimeSec; tph["maxDailyMin"] = cfg.phPump.maxDailyRuntimeMin;
+            JsonObject tcl = timingDoc.createNestedObject("chlorine"); tcl["minOn"] = cfg.chlorinePump.minOnTimeSec; tcl["minOff"] = cfg.chlorinePump.minOffTimeSec; tcl["maxDailyMin"] = cfg.chlorinePump.maxDailyRuntimeMin;
+            JsonObject tf = timingDoc.createNestedObject("filter"); tf["minOn"] = cfg.filterPump.minOnTimeSec; tf["minOff"] = cfg.filterPump.minOffTimeSec; tf["maxDailyMin"] = cfg.filterPump.maxDailyRuntimeMin; tf["preRunDelay"] = cfg.filterPump.filterPreRunDelayMin;
+            String timingJson; serializeJson(timingDoc, timingJson); mqttManager->publish("pump_config", timingJson, false);
         }
     }
 
