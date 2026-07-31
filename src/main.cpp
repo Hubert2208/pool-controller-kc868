@@ -119,9 +119,9 @@ void handleRoot() {
     html += "<div id='app'>";
     // ── Header ──
     html += "<div class='card'><h1> Pool Controller</h1>";
-    html += "<p><span class='status-dot' :class=\"apiData.wifi?'dot-ok':'dot-bad'\"></span>{{ apiData.wifi?'WiFi ✅':'WiFi ❌' }} | ";
-    html += "<span class='status-dot' :class=\"apiData.mqtt?'dot-ok':'dot-bad'\"></span>{{ apiData.mqtt?'MQTT ✅':'MQTT ❌' }} | ";
-    html += "IP: {{ apiData.ip || '—' }} | <span class='status-dot' :class=\"apiData.manual_mode?'dot-bad':'dot-ok'\"></span>{{ apiData.manual_mode?'MANUAL':'AUTO' }}</p>";
+    html += "<p><span class='status-dot' :class=\"apiData.wifi?'dot-ok':'dot-bad'\"></span>{{ apiData.wifi?'WiFi OK':'WiFi OFF' }} | ";
+    html += "<span class='status-dot' :class=\"apiData.mqtt?'dot-ok':'dot-bad'\"></span>{{ apiData.mqtt?'MQTT OK':'MQTT OFF' }} | ";
+    html += "IP: {{ apiData.ip || '-' }} | <span class='status-dot' :class=\"apiData.manual_mode?'dot-bad':'dot-ok'\"></span>{{ apiData.manual_mode?'MANUAL':'AUTO' }}</p>";
     html += "</div>";
     // ── System / Sensors ──
     html += "<div class='card'><h2>System</h2>";
@@ -131,8 +131,8 @@ void handleRoot() {
     html += "<div class='card'><h2>Sensors</h2><p>";
     html += "pH: <span class='value'>{{ formatNum(apiData.ph, 2) }}</span> pH | ";
     html += "ORP: <span class='value'>{{ formatNum(apiData.orp, 0) }}</span> mV | ";
-    html += "Water: <span class='value'>{{ formatNum(apiData.water_temp, 1) }}</span>°C | ";
-    html += "Air: <span class='value'>{{ formatNum(apiData.air_temp, 1) }}</span>°C | ";
+    html += "Water: <span class='value'>{{ formatNum(apiData.water_temp, 1) }}</span>C | ";
+    html += "Air: <span class='value'>{{ formatNum(apiData.air_temp, 1) }}</span>C | ";
     html += "Pressure: <span class='value'>{{ formatNum(apiData.filter_pressure, 2) }}</span> bar";
     html += "</p></div>";
     // ── Chemistry Setpoints ──
@@ -165,8 +165,8 @@ void handleRoot() {
     html += "<div class='rt-row'><span class='rt-label'>Required:</span><span class='rt-value'>{{ requiredRuntime }} min</span></div>";
     html += "<div class='rt-row'><span class='rt-label'>Today:</span><span class='rt-value'>{{ actualRuntime }} min</span></div>";
     html += "<div class='rt-row'><span class='rt-label'>Progress:</span>";
-    html += "<span class='rt-value' :class=\"progressPct >= 100 ? '' : 'rt-bad'\">{{ progressPct }}%</span></div>";
-    html += "<div class='progress-bg'><div class='progress-fill' :class=\"progressPct >= 100 ? 'ok' : 'low'\" :style=\"{ width: progressPct + '%', minWidth: actualRuntime > 0 ? '4px' : '0' }\"></div></div>";
+    html += "<span class='rt-value' :class=\"progressBadClass\">{{ progressPct }}%</span></div>";
+    html += "<div class='progress-bg'><div class='progress-fill' :class=\"progressFillClass\" :style=\"progressStyle\"></div></div>";
     html += "</p></div>";
     // ── Relay Test ──
     html += "<div class='card'><h2>Relay Test</h2><p>";
@@ -197,11 +197,11 @@ void handleRoot() {
     html += "clEnabled(){return this.apiData?.cl_enabled || false},";
     html += "requiredRuntime(){return this.apiData?.pumps?.filter?.required_runtime_min || 0},";
     html += "actualRuntime(){return this.apiData?.pumps?.filter?.today_min || 0},";
-    html += "progressPct(){const r=this.requiredRuntime,a=this.actualRuntime;return r>0?Math.max(1,Math.round((a/r)*100)):0}";
+    html += "progressPct(){const r=this.requiredRuntime,a=this.actualRuntime;return r>0?Math.max(1,Math.round((a/r)*100)):0},progressBadClass(){return this.progressPct>=100?'':'rt-bad'},progressFillClass(){return this.progressPct>=100?'ok':'low'},progressStyle(){return{width:this.progressPct+'%',minWidth:this.actualRuntime>=1?'4px':'0'}}";
     html += "}";
     html += ",methods:{";
     html += "async fetchApi(){try{const r=await fetch('/api');this.apiData=await r.json();if(this.apiData.ph_setpoint!==undefined)this.setpoints.ph=this.apiData.ph_setpoint;if(this.apiData.orp_setpoint!==undefined)this.setpoints.orp=this.apiData.orp_setpoint;}catch(e){console.error('fetchApi error:',e);this.fetchError=e.message;}},";
-    html += "formatNum(v,d){return v!=null?v.toFixed(d):'—'},";
+    html += "formatNum(v,d){return v!=null?v.toFixed(d):'-'},";
     html += "async applySetpoints(){this.savedMsg='Saving...';await fetch('/api/setpoint?ph='+this.setpoints.ph+'&orp='+this.setpoints.orp);this.savedMsg='Saved!';setTimeout(()=>this.savedMsg='',2000);this.fetchApi();},";
     html += "async setMode(m){await fetch('/api/manual?mode='+(m?1:0));this.fetchApi();},";
     html += "async togglePump(id){const p=this.pumps[id];if(!p)return;await fetch('/api/pump/set?id='+id+'&state='+(p.on?0:1));this.fetchApi();},";
@@ -213,7 +213,7 @@ void handleRoot() {
     html += "api.mount('#app');";
     html += "</script>";
     html += "</body></html>";
-    webServer.send(200, "text/html", html);
+    webServer.send(200, "text/html; charset=utf-8", html);
 }
 
 void handleAPI() {
