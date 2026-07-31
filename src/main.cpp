@@ -208,7 +208,7 @@ void handleRoot() {
     html += "async allOff(){await fetch('/api/alloff');this.fetchApi();}";
     html += "}";
     html += ",mounted(){this.fetchApi();setInterval(()=>this.fetchApi(),15000)}";
-    html += "})";
+    html += "});";
     html += "api.mount('#app');";
     html += "</script>";
     html += "</body></html>";
