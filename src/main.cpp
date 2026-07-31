@@ -216,7 +216,7 @@ void handleRoot() {
     webServer.send(200, "text/html", html);
 }
 
-void handleAPI() { {
+void handleAPI() {
     AppConfig& cfg = configManager.get();
     StaticJsonDocument<1024> doc;
     doc["uptime_ms"] = millis(); doc["wifi"] = WiFi.isConnected(); doc["mqtt"] = mqttManager && mqttManager->isConnected();
