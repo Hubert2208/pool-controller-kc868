@@ -98,7 +98,7 @@ void handleRoot() {
     html += ".rt-value{color:#0f0;font-weight:bold}";
     html += ".rt-bad{color:#f44}";
     html += ".progress-bg{background:#0a0a2e;border:1px solid #333;border-radius:4px;height:14px;margin:4px 0;overflow:hidden}";
-    html += ".progress-fill{height:100%;width:0;background:linear-gradient(90,#0af,#0f0);border-radius:2px;transition:width 0.5s}";
+    html += ".progress-fill{height:100%;width:0;background:linear-gradient(90,#0af,#0f0);border-radius:2px}";
     html += ".progress-fill.low{background:linear-gradient(90,#f80,#f44)}";
     html += ".progress-fill.ok{background:linear-gradient(90,#0af,#0f0)}";
     html += "</style></head><body><h1>🏊 Pool Controller</h1>";
