@@ -194,7 +194,7 @@ void handleRoot() {
     html += "relays(){return this.apiData?.relays || []},";
     html += "phEnabled(){return this.apiData?.ph_enabled || false},";
     html += "clEnabled(){return this.apiData?.cl_enabled || false},";
-    html += "requiredRuntime(){const r=this.apiData?.pumps?.filter?.required_runtime_min||0;return Math.round(r)},;
+    html += "requiredRuntime(){const r=this.apiData?.pumps?.filter?.required_runtime_min||0;return Math.round(r)},";
     html += "actualRuntime(){return this.apiData?.pumps?.filter?.today_min || 0},";
     html += "progressPct(){const r=this.requiredRuntime,a=this.actualRuntime;return r>0?Math.max(1,Math.round((a/r)*100)):0},progressBadClass(){return this.progressPct>=100?'':'rt-bad'},progressFillClass(){return this.progressPct>=100?'ok':'low'},progressStyle(){return{width:this.progressPct+'%',minWidth:this.actualRuntime>=1?'4px':'0'}}";
     html += "}";
