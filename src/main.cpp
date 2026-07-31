@@ -72,7 +72,7 @@ void handleRoot() {
     String html = "<!DOCTYPE html><html><head><title>Pool Controller</title>";
     html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>";
     html += "<meta http-equiv='refresh' content='30'>";
-    html += "<script src='https://unpkg.com/vue@3/dist/vue.global.prod.js'></script>";
+    html += "<script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>";
     html += "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap' rel='stylesheet'>";
     html += "<style>";
     html += "*{margin:0;padding:0;box-sizing:border-box}";
@@ -152,11 +152,11 @@ void handleRoot() {
     html += "</p></div>";
     // ── Pump Control ──
     html += "<div class='card'><h2>Pump Control</h2><p>";
-    html += "<div v-if='pumps.filter'><button class='btn' :class=\"pumps.filter.on?'btn-on':'btn-off'\" @click=\"togglePump('filter')\" >Filter {{ pumps.filter.on?'ON':'OFF' }}</button> ";
+    html += "<div v-if='pumps.filter'><button class='btn' :class=\"pumps.filter.on?'btn-on':'btn-off'\" @click=\"togglePump('filter')\">Filter {{ pumps.filter.on?'ON':'OFF' }}</button> ";
     html += "<span class='runtime'>({{ pumps.filter.current_min }}m / {{ pumps.filter.today_min }}m today)</span></div>";
-    html += "<div v-if='pumps.ph'><button class='btn' :class=\"pumps.ph.on?'btn-on':'btn-off'\" @click=\"togglePump('ph')\" >pH {{ pumps.ph.on?'ON':'OFF' }}</button> ";
+    html += "<div v-if='pumps.ph'><button class='btn' :class=\"pumps.ph.on?'btn-on':'btn-off'\" @click=\"togglePump('ph')\">pH {{ pumps.ph.on?'ON':'OFF' }}</button> ";
     html += "<span class='runtime'>({{ pumps.ph.current_min }}m / {{ pumps.ph.today_min }}m today)</span></div>";
-    html += "<div v-if='pumps.chlorine'><button class='btn' :class=\"pumps.chlorine.on?'btn-on':'btn-off'\" @click=\"togglePump('chlorine')\" >Cl {{ pumps.chlorine.on?'ON':'OFF' }}</button> ";
+    html += "<div v-if='pumps.chlorine'><button class='btn' :class=\"pumps.chlorine.on?'btn-on':'btn-off'\" @click=\"togglePump('chlorine')\">Cl {{ pumps.chlorine.on?'ON':'OFF' }}</button> ";
     html += "<span class='runtime'>({{ pumps.chlorine.current_min }}m / {{ pumps.chlorine.today_min }}m today)</span></div>";
     html += "</p></div>";
     // ── Filter Pump Runtime ──
@@ -186,7 +186,7 @@ void handleRoot() {
     html += "<script>";
     html += "const api = Vue.createApp({";
     html += "data(){return {";
-    html += "data:null,";
+    html += "data:{},";
     html += "setpoints:{ph:7.2,orp:750},";
     html += "savedMsg:''";
     html += "}}";
