@@ -119,21 +119,21 @@ void handleRoot() {
     html += "<div id='app'>";
     // ── Header ──
     html += "<div class='card'><h1> Pool Controller</h1>";
-    html += "<p><span class='status-dot' :class=\"data.wifi?'dot-ok':'dot-bad'\"></span>{{ data.wifi?'WiFi ✅':'WiFi ❌' }} | ";
-    html += "<span class='status-dot' :class=\"data.mqtt?'dot-ok':'dot-bad'\"></span>{{ data.mqtt?'MQTT ✅':'MQTT ❌' }} | ";
-    html += "IP: {{ data.ip || '—' }} | <span class='status-dot' :class=\"data.manual_mode?'dot-bad':'dot-ok'\"></span>{{ data.manual_mode?'MANUAL':'AUTO' }}</p>";
+    html += "<p><span class='status-dot' :class=\"apiData.wifi?'dot-ok':'dot-bad'\"></span>{{ apiData.wifi?'WiFi ✅':'WiFi ❌' }} | ";
+    html += "<span class='status-dot' :class=\"apiData.mqtt?'dot-ok':'dot-bad'\"></span>{{ apiData.mqtt?'MQTT ✅':'MQTT ❌' }} | ";
+    html += "IP: {{ apiData.ip || '—' }} | <span class='status-dot' :class=\"apiData.manual_mode?'dot-bad':'dot-ok'\"></span>{{ apiData.manual_mode?'MANUAL':'AUTO' }}</p>";
     html += "</div>";
     // ── System / Sensors ──
     html += "<div class='card'><h2>System</h2>";
-    html += "<p>Uptime: {{ Math.floor(data.uptime_ms/60000) }} min</p>";
-    html += "<p>Free Heap: {{ data.free_heap }} bytes</p>";
+    html += "<p>Uptime: {{ Math.floor(apiData.uptime_ms/60000) }} min</p>";
+    html += "<p>Free Heap: {{ apiData.free_heap }} bytes</p>";
     html += "</div>";
     html += "<div class='card'><h2>Sensors</h2><p>";
-    html += "pH: <span class='value'>{{ formatNum(data.ph, 2) }}</span> pH | ";
-    html += "ORP: <span class='value'>{{ formatNum(data.orp, 0) }}</span> mV | ";
-    html += "Water: <span class='value'>{{ formatNum(data.water_temp, 1) }}</span>°C | ";
-    html += "Air: <span class='value'>{{ formatNum(data.air_temp, 1) }}</span>°C | ";
-    html += "Pressure: <span class='value'>{{ formatNum(data.filter_pressure, 2) }}</span> bar";
+    html += "pH: <span class='value'>{{ formatNum(apiData.ph, 2) }}</span> pH | ";
+    html += "ORP: <span class='value'>{{ formatNum(apiData.orp, 0) }}</span> mV | ";
+    html += "Water: <span class='value'>{{ formatNum(apiData.water_temp, 1) }}</span>°C | ";
+    html += "Air: <span class='value'>{{ formatNum(apiData.air_temp, 1) }}</span>°C | ";
+    html += "Pressure: <span class='value'>{{ formatNum(apiData.filter_pressure, 2) }}</span> bar";
     html += "</p></div>";
     // ── Chemistry Setpoints ──
     html += "<div class='card'><h2>Chemistry Setpoints</h2>";
@@ -147,8 +147,8 @@ void handleRoot() {
     html += "<span class='sp-saved' v-show='savedMsg'>{{ savedMsg }}</span></div>";
     // ── Control Mode ──
     html += "<div class='card'><h2>Control Mode</h2><p>";
-    html += "<button class='btn' :class=\"data.manual_mode?'btn-off':'btn-on'\" @click='setMode(false)'>AUTO Mode</button> ";
-    html += "<button class='btn' :class=\"data.manual_mode?'btn-on':'btn-off'\" @click='setMode(true)'>MANUAL Mode</button>";
+    html += "<button class='btn' :class=\"apiData.manual_mode?'btn-off':'btn-on'\" @click='setMode(false)'>AUTO Mode</button> ";
+    html += "<button class='btn' :class=\"apiData.manual_mode?'btn-on':'btn-off'\" @click='setMode(true)'>MANUAL Mode</button>";
     html += "</p></div>";
     // ── Pump Control ──
     html += "<div class='card'><h2>Pump Control</h2><p>";
@@ -186,21 +186,21 @@ void handleRoot() {
     html += "<script>";
     html += "const api = Vue.createApp({";
     html += "data(){return {";
-    html += "data:{},";
+    html += "apiData:{},";
     html += "setpoints:{ph:7.2,orp:750},";
-    html += "savedMsg:''";
+    html += "savedMsg:'',fetchError:''";
     html += "}}";
     html += ",computed:{";
-    html += "pumps(){return this.data?.pumps || {}},";
-    html += "relays(){return this.data?.relays || []},";
-    html += "phEnabled(){return this.data?.ph_enabled || false},";
-    html += "clEnabled(){return this.data?.cl_enabled || false},";
-    html += "requiredRuntime(){return this.data?.pumps?.filter?.required_runtime_min || 0},";
-    html += "actualRuntime(){return this.data?.pumps?.filter?.today_min || 0},";
+    html += "pumps(){return this.apiData?.pumps || {}},";
+    html += "relays(){return this.apiData?.relays || []},";
+    html += "phEnabled(){return this.apiData?.ph_enabled || false},";
+    html += "clEnabled(){return this.apiData?.cl_enabled || false},";
+    html += "requiredRuntime(){return this.apiData?.pumps?.filter?.required_runtime_min || 0},";
+    html += "actualRuntime(){return this.apiData?.pumps?.filter?.today_min || 0},";
     html += "progressPct(){const r=this.requiredRuntime,a=this.actualRuntime;return r>0?Math.max(1,Math.round((a/r)*100)):0}";
     html += "}";
     html += ",methods:{";
-    html += "async fetchApi(){const r=await fetch('/api');this.data=await r.json();this.setpoints.ph=this.data.ph_setpoint;this.setpoints.orp=this.data.orp_setpoint;},";
+    html += "async fetchApi(){try{const r=await fetch('/api');this.apiData=await r.json();if(this.apiData.ph_setpoint!==undefined)this.setpoints.ph=this.apiData.ph_setpoint;if(this.apiData.orp_setpoint!==undefined)this.setpoints.orp=this.apiData.orp_setpoint;}catch(e){console.error('fetchApi error:',e);this.fetchError=e.message;}},";
     html += "formatNum(v,d){return v!=null?v.toFixed(d):'—'},";
     html += "async applySetpoints(){this.savedMsg='Saving...';await fetch('/api/setpoint?ph='+this.setpoints.ph+'&orp='+this.setpoints.orp);this.savedMsg='Saved!';setTimeout(()=>this.savedMsg='',2000);this.fetchApi();},";
     html += "async setMode(m){await fetch('/api/manual?mode='+(m?1:0));this.fetchApi();},";
