@@ -156,7 +156,7 @@ void handleRoot() {
         html += "<div class='rt-row'><span class='rt-label'>Required:</span><span class='rt-value'>" + String((int)requiredMin) + " min</span></div>";
         html += "<div class='rt-row'><span class='rt-label'>Today:</span><span class='rt-value'>" + String(actualMin) + " min</span></div>";
         html += "<div class='rt-row'><span class='rt-label'>Progress:</span><span class='rt-value" + String(valClass) + "'>" + String(pct) + "%</span></div>";
-        html += "<div class='progress-bg'><div class='progress-fill " + String(barClass) + "' style='width:" + String(pct) + "%" + (pct > 0 ? ";min-width:4px" : "") + "'></div></div>";
+        html += "<div class='progress-bg'><div class='progress-fill " + String(barClass) + "' style='width:" + String(pct) + "%" + (actualMin > 0 ? ";min-width:4px" : "") + "'></div></div>";
     } else {
         html += "<span class='rt-bad'>Filter pump logic not available</span>";
     }
